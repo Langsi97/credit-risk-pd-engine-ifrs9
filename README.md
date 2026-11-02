@@ -48,6 +48,28 @@ The project is considered successful when the following outcomes are met:
 - test suite covering validation and core logic
 - scenario-based ECL outputs in the `reports/` directory
 
+## Data source
+
+The model is built on Bondora's public loan-level dataset: every loan issued on the Bondora platform since February 2009, with borrower demographics, loan terms, credit ratings and repayment status. Bondora's investor product has since been rebranded Go & Grow, and the public statistics page moved with it.
+
+| Source | Link | Coverage | Access |
+|---|---|---|---|
+| Official (default) | [Go & Grow public statistics](https://goandgrow.eu/en/public-statistics/), file `loan_dataset_investor.xlsx` | 2009 to last month, refreshed by Bondora | Direct download |
+| Kaggle snapshot | [sid321axn/bondora-peer-to-peer-lending-loan-data](https://www.kaggle.com/datasets/sid321axn/bondora-peer-to-peer-lending-loan-data) | 2009 to mid-2021 | Kaggle account and API token |
+| IEEE DataPort snapshot | [Bondora Peer-to-Peer Lending Data](https://ieee-dataport.org/open-access/bondora-peer-peer-lending-data), DOI [10.21227/33kz-0s65](https://doi.org/10.21227/33kz-0s65) | 2009-03-01 to 2020-01-27 | Free IEEE account login |
+
+Download with:
+
+```bash
+python -m pdengine.download_data                      # official source
+python -m pdengine.download_data --source kaggle      # needs: pip install kaggle + ~/.kaggle/kaggle.json
+python -m pdengine.download_data --source ieee --file path/to/Bondora_dataset.zip
+```
+
+Files land in `data/raw/<source>/` with a `manifest.json` recording the URL, retrieval time, size and SHA-256 of each file, so every model run can be traced to the exact snapshot used. For a reproducible out-of-time split, record the manifest hash in the model report rather than relying on "latest".
+
+**Licence and terms.** None of the three sources publishes the data under a named open licence. The official file is provided by Bondora / Go & Grow under its general [Terms of Use](https://goandgrow.eu/en/terms/); the Kaggle and IEEE DataPort copies are third-party redistributions of the same Bondora data and state no licence of their own. This repository therefore never redistributes the data: `data/*` is git-ignored, and anyone reproducing the work downloads it from the source. The MIT licence of this repository covers the code only, not the data.
+
 ## Repository structure
 
 - `data/` — local datasets and raw inputs (ignored by Git)
