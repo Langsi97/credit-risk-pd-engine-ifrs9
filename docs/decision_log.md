@@ -11,6 +11,7 @@ A running record of the modelling and engineering choices in this project, why t
 | D-005 | 2026-11-02 | Accepted |
 | D-006 | 2026-11-02 | Accepted |
 | D-007 | 2026-11-02 | Accepted |
+| D-008 | 2026-11-02 | Accepted |
 
 ---
 
@@ -65,6 +66,18 @@ A running record of the modelling and engineering choices in this project, why t
 **Why.** One loan out of 179,235 does not justify stopping the pipeline, and dropping it silently would hide a data-quality issue. The Kaggle record describes the borrower at application time, which is the moment the scorecard predicts from.
 
 **Rejected.** Failing the build (too strict for a single corrected record). Using the official country (it may reflect changes after the application).
+
+## D-008 Slovakia is kept in the data but not modelled or reported on its own
+
+**Context.** The README scope listed four countries: Estonia, Finland, Spain and Slovakia. The warehouse shows only 296 Slovak loans in the joined population (0.2% of 179,235), with a 12-month default rate of 70.6%, against 110,714 Estonian, 41,955 Finnish and 26,270 Spanish loans.
+
+**Decision.** Slovak loans stay in the warehouse and in the pooled training data, with country as a candidate feature. Slovakia gets no country-level performance reporting, calibration or stress scenario. The project scope is Estonia, Finland and Spain.
+
+**Why.** 296 loans give an out-of-time sample of a few dozen defaults at best: far too few for a stable Gini, calibration or ECL estimate. Removing them would throw away valid observations for no gain; reporting on them would present noise as a result.
+
+**Rejected.** Dropping Slovak loans entirely (loses data, no benefit). Modelling and reporting Slovakia separately (statistically meaningless at this size).
+
+**Revisit if.** The official feed adds enough Slovak loans with borrower features to support a separate analysis.
 
 ---
 
