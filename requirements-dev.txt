@@ -10,6 +10,6 @@ ruff==0.8.4
 ipykernel==6.29.5
 
 # Kaggle CLI 1.8+ supports the new KGAT_ access tokens (KAGGLE_API_TOKEN
-# or ~/.kaggle/access_token). Only needed for: python src/download_data.py --source kaggle
+# or ~/.kaggle/access_token). Only needed for: python -m pdengine.download_data --source kaggle
 kaggle==1.8.4
 six==1.17.0  # kaggle 1.8.4 imports six but does not declare it

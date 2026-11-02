@@ -1,0 +1,19 @@
+# Store every text file with LF line endings in the repository.
+# Git converts to your platform's line endings on checkout (CRLF on Windows),
+# so diffs stay clean whatever editor or OS touched the file.
+* text=auto
+
+# Files that must keep LF even on Windows
+Makefile        text eol=lf
+*.sh            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.ipynb         text eol=lf
+
+# Binary files: never touch line endings, never diff as text
+*.parquet       binary
+*.duckdb        binary
+*.xlsx          binary
+*.zip           binary
+*.png           binary
+*.pdf           binary
