@@ -28,10 +28,10 @@ Raw data is never committed: data/* is git-ignored.
 
 Usage
 -----
-    python src/download_data.py                       # official source
-    python src/download_data.py --source kaggle
-    python src/download_data.py --source ieee --file ~/Downloads/Bondora_dataset.zip
-    python src/download_data.py --force               # re-download even if present
+    python -m pdengine.download_data                       # official source
+    python -m pdengine.download_data --source kaggle
+    python -m pdengine.download_data --source ieee --file ~/Downloads/Bondora_dataset.zip
+    python -m pdengine.download_data --force               # re-download even if present
 
 Only the Python standard library is needed (plus `kaggle` for --source kaggle).
 """
@@ -47,10 +47,10 @@ import sys
 import urllib.error
 import urllib.request
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]  # src/pdengine/ -> repo root
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 
 # Official Bondora / Go & Grow public statistics. Tried in order; the first
@@ -144,7 +144,7 @@ def write_manifest(out_dir: Path, source: str, origin: str, files: list[Path]) -
     manifest = {
         "source": source,
         "origin": origin,
-        "retrieved_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "retrieved_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "files": [
             {
                 "path": str(p.relative_to(PROJECT_ROOT)).replace("\\", "/"),
@@ -191,7 +191,7 @@ def fetch_official(out_dir: Path, force: bool) -> list[Path]:
         "Could not download the official Bondora dataset.\n  "
         + "\n  ".join(errors)
         + f"\nOpen {OFFICIAL_PAGE}, download the loan dataset by hand, and register it with:\n"
-        "  python src/download_data.py --source official --file <path-to-file>"
+        "  python -m pdengine.download_data --source official --file <path-to-file>"
     )
 
 
@@ -224,7 +224,11 @@ def register_local(out_dir: Path, source: str, file: Path) -> list[Path]:
     dest = out_dir / file.name
     if dest.resolve() != file:
         shutil.copy2(file, dest)
-    origin = {"official": OFFICIAL_PAGE, "kaggle": KAGGLE_PAGE, "ieee": f"{IEEE_PAGE} (doi:{IEEE_DOI})"}[source]
+    origin = {
+        "official": OFFICIAL_PAGE,
+        "kaggle": KAGGLE_PAGE,
+        "ieee": f"{IEEE_PAGE} (doi:{IEEE_DOI})",
+    }[source]
     return _finalise(out_dir, source, f"manual download from {origin}", dest)
 
 
@@ -235,7 +239,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--source", choices=["official", "kaggle", "ieee"], default="official")
     p.add_argument("--file", type=Path, help="register a file you downloaded by hand")
-    p.add_argument("--out", type=Path, default=RAW_DIR, help="base output folder (default data/raw)")
+    p.add_argument(
+        "--out", type=Path, default=RAW_DIR, help="base output folder (default data/raw)"
+    )
     p.add_argument("--force", action="store_true", help="re-download even if the file exists")
     return p.parse_args(argv)
 
@@ -252,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         raise SystemExit(
             f"IEEE DataPort needs a login. Download 'Bondora_dataset' from {IEEE_PAGE}, then run:\n"
-            "  python src/download_data.py --source ieee --file <path-to-zip>"
+            "  python -m pdengine.download_data --source ieee --file <path-to-zip>"
         )
     return 0
 

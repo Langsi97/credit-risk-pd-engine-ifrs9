@@ -61,9 +61,9 @@ The model is built on Bondora's public loan-level dataset: every loan issued on 
 Download with:
 
 ```bash
-python src/download_data.py                      # official source
-python src/download_data.py --source kaggle      # needs: pip install kaggle + ~/.kaggle/kaggle.json
-python src/download_data.py --source ieee --file path/to/Bondora_dataset.zip
+python -m pdengine.download_data                      # official source
+python -m pdengine.download_data --source kaggle      # needs: pip install kaggle + ~/.kaggle/kaggle.json
+python -m pdengine.download_data --source ieee --file path/to/Bondora_dataset.zip
 ```
 
 Files land in `data/raw/<source>/` with a `manifest.json` recording the URL, retrieval time, size and SHA-256 of each file, so every model run can be traced to the exact snapshot used. For a reproducible out-of-time split, record the manifest hash in the model report rather than relying on "latest".

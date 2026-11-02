@@ -1,0 +1,12 @@
+# Development tools: testing, linting and data download.
+# Install everything with: pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest==8.3.3
+pytest-cov==6.0.0
+ruff==0.8.4
+
+# Kaggle CLI 1.8+ supports the new KGAT_ access tokens (KAGGLE_API_TOKEN
+# or ~/.kaggle/access_token). Only needed for: python src/download_data.py --source kaggle
+kaggle==1.8.4
+six==1.17.0  # kaggle 1.8.4 imports six but does not declare it

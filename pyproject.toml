@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdengine"
+version = "0.1.0"
+description = "Credit risk scorecard, PD engine and IFRS 9 stress test on Bondora consumer loans"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Langsi Ambe Revelation" }]
+requires-python = ">=3.12"
+# Runtime dependencies are read from requirements.txt, so the pins live in one place.
+dynamic = ["dependencies"]
+
+[project.urls]
+Repository = "https://github.com/Langsi97/credit-risk-pd-engine-ifrs9"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import order, B bugbear, UP pyupgrade, SIM simplify
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pdengine"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+# ---------------------------------------------------------------- coverage
+[tool.coverage.run]
+source = ["pdengine"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:"]
