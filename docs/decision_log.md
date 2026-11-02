@@ -10,6 +10,7 @@ A running record of the modelling and engineering choices in this project, why t
 | D-004 | 2026-11-02 | Proposed |
 | D-005 | 2026-11-02 | Accepted |
 | D-006 | 2026-11-02 | Accepted |
+| D-007 | 2026-11-02 | Accepted |
 
 ---
 
@@ -54,6 +55,16 @@ A running record of the modelling and engineering choices in this project, why t
 **Decision.** Work happens on feature branches (starting with `data-setup`) and reaches `main` only through a pull request with green CI.
 
 **Why.** Keeps `main` always working, and the pull request history documents how the project was built.
+
+## D-007 Joined loans that disagree on country are flagged, not dropped
+
+**Context.** Building the warehouse on the real data found one loan (`F9E26B81-AEE4-442B-B4FC-A87400B4F8E1`) with the same ID, issue date and amount in both sources but a different country: Estonia in the Kaggle snapshot, Finland in the official feed. The preliminary EDA showed this as "100.00% agree" because the share was rounded.
+
+**Decision.** The warehouse build fails only on broken keys (duplicate loan IDs, or Kaggle loans missing from the official feed). Country disagreements are kept, flagged in `loans.country_mismatch`, and counted in the `_checks` table. `country_name` uses the Kaggle country, mapped from its ISO code.
+
+**Why.** One loan out of 179,235 does not justify stopping the pipeline, and dropping it silently would hide a data-quality issue. The Kaggle record describes the borrower at application time, which is the moment the scorecard predicts from.
+
+**Rejected.** Failing the build (too strict for a single corrected record). Using the official country (it may reflect changes after the application).
 
 ---
 
