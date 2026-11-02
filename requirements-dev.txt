@@ -6,6 +6,9 @@ pytest==8.3.3
 pytest-cov==6.0.0
 ruff==0.8.4
 
+# Jupyter kernel so notebooks/ run in VS Code with the project venv.
+ipykernel==6.29.5
+
 # Kaggle CLI 1.8+ supports the new KGAT_ access tokens (KAGGLE_API_TOKEN
 # or ~/.kaggle/access_token). Only needed for: python src/download_data.py --source kaggle
 kaggle==1.8.4
