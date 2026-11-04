@@ -16,6 +16,8 @@ A running record of the modelling and engineering choices in this project, why t
 | D-010 | 2026-11-04 | Accepted |
 | D-011 | 2026-11-04 | Accepted |
 | D-012 | 2026-11-04 | Accepted |
+| D-013 | 2026-11-04 | Accepted |
+| D-014 | 2026-11-04 | Accepted |
 
 ---
 
@@ -132,6 +134,36 @@ A running record of the modelling and engineering choices in this project, why t
 **Why.** With `Interest` in, the "our scorecard vs Bondora" comparison is partly circular: part of our model's ranking power would be Bondora's model. `MonthlyPayment` carries the same pricing signal through the rate. Leaving both out keeps the champion a pure applicant-risk model, and the sensitivity run shows how much the price adds.
 
 **Rejected.** Keeping `Interest` in the champion without comment (benchmark not independent). Dropping it with no sensitivity run (hides how much predictive power it holds). Keeping `MonthlyPayment` (it would bring the rate back in indirectly).
+
+
+## D-013 The pre-2016 cut removes every Slovak loan from the Track A samples
+
+**Context.** D-008 keeps Slovak loans in the pooled training data and leaves them out of country-level reporting. The exclusions waterfall in notebook 03 (step 2) shows that all 296 Slovak loans were issued between 13 March 2014 and 5 January 2015, before the development window starts (1 January 2016, roadmap D3).
+
+**Decision.** No change to D-008. The waterfall keeps a Slovakia step that flags the loans and removes none, so the D-008 rule stays visible; the pre-2016 step then removes all 296. The Track A train, test and out-of-time samples contain Estonia, Finland and Spain only, and `Country` has three values in practice.
+
+**Why.** Recording this avoids a reader assuming Slovak loans are in the model because D-008 says "kept in the pool".
+
+**Rejected.** Moving the Slovakia step after the pre-2016 step (it would show 0 Slovak loans and hide where they went). Editing D-008 (decisions are never edited; this note adds the fact).
+
+## D-014 The two Spanish bureau scores are removed from the scorecard candidates
+
+**Context.** D-009 says a feature is a candidate only if it is populated for most loans in both the development and out-of-time windows, and that bureau scores are judged within their own country. Notebook 03 (step 4) checked this on the final samples:
+
+| Score | Spain, development | Spain, out-of-time |
+|---|---|---|
+| `CreditScoreEsEquifaxRisk` | missing for 57% | missing for 100% |
+| `CreditScoreEsMicroL` | real grade (`M1` to `M10`) for 45%, plain `M` for 55% | plain `M` for 100% |
+
+Every Estonian and Finnish loan also carries the plain code `M` in `CreditScoreEsMicroL`. The Estonian (`CreditScoreEeMini`) and Finnish (`CreditScoreFiAsiakasTietoRiskGrade`) scores are filled in for practically every loan of their own country in both windows.
+
+**Decision.** Set `candidate: false` for `CreditScoreEsEquifaxRisk` and `CreditScoreEsMicroL` in `config/feature_registry.yaml`, with the note "D-014: no information for Spanish out-of-time loans". Keep the Estonian and Finnish scores as candidates.
+
+**Why.** Neither Spanish score carries any information for the out-of-time sample, so the model could not use them where it is tested, and their "missing" or `M` group would partly stand for "issued before 2020". Spain stays represented through `Country` and the ordinary application fields.
+
+**Rejected.** Keeping them with a "missing" bin (teaches the issue period, the problem D-009 exists to prevent). Imputing a Spanish score for 2020 loans (nothing to impute from).
+
+**Revisit if.** A newer feature extract has Spanish bureau scores for 2020 loans.
 
 ---
 
