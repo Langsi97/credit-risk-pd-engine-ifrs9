@@ -65,8 +65,8 @@ columns:
   MaturityDate_Original: {class: application, candidate: false, source: audit, note: "date: used to derive features, not a raw input"}
   MonthlyPaymentDay: {class: application, candidate: true, source: audit}
   WorkExperience: {class: application, candidate: false, source: audit, note: "D-009: not collected from 1 June 2017"}
-  CreditScoreEsMicroL: {class: application, candidate: true, source: audit, note: "D-009: Spanish bureau, judge within country"}
-  CreditScoreEsEquifaxRisk: {class: application, candidate: true, source: audit, note: "D-009: Spanish bureau, judge within country"}
+  CreditScoreEsMicroL: {class: application, candidate: false, source: audit, note: "D-014: no information for Spanish out-of-time loans"}
+  CreditScoreEsEquifaxRisk: {class: application, candidate: false, source: audit, note: "D-014: no information for Spanish out-of-time loans"}
   CreditScoreFiAsiakasTietoRiskGrade: {class: application, candidate: true, source: audit, note: "D-009: Finnish bureau, judge within country"}
   CreditScoreEeMini: {class: application, candidate: true, source: audit, note: "D-009: Estonian bureau, judge within country"}
 
