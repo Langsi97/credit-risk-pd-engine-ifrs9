@@ -1,0 +1,152 @@
+# Feature registry for the Kaggle Bondora snapshot (all 112 columns).
+#
+# Why this file exists: the Kaggle file was frozen on 20 July 2021, so many of its columns
+# describe what happened AFTER a loan started (balances, late payments, recoveries). A model
+# that sees them learns the answer instead of the borrower's risk (data leakage).
+# Every column is given exactly one class here, and pdengine.registry refuses to build a
+# model matrix that contains anything other than a candidate feature.
+#
+# Source of the classification: notebooks/02_data_audit.ipynb, step 4 (and roadmap section 5).
+# Fields per column:
+#   class      one of: key, application, protected, personal, benchmark, outcome, leak
+#   candidate  true = may enter a model. Only class 'application' can be true.
+#   source     roadmap = classified in the roadmap; audit = classified in notebook 02
+#   note       why a column is excluded, or what to watch (decision IDs in docs/decision_log.md)
+#
+# Changing this file changes what the models may use: record the reason in the decision log.
+
+version: 1
+
+columns:
+
+  # ---- key: Identifiers: used to join tables, never as model inputs.
+  LoanId: {class: key, candidate: false, source: audit}
+  LoanNumber: {class: key, candidate: false, source: audit}
+
+  # ---- application: Known on the day the loan is decided. Only these can be model candidates.
+  NewCreditCustomer: {class: application, candidate: true, source: roadmap}
+  VerificationType: {class: application, candidate: true, source: roadmap}
+  LanguageCode: {class: application, candidate: true, source: roadmap}
+  Country: {class: application, candidate: true, source: roadmap, note: "D-008: Slovakia kept in the pool, country is a candidate"}
+  AppliedAmount: {class: application, candidate: true, source: roadmap}
+  Amount: {class: application, candidate: true, source: roadmap}
+  Interest: {class: application, candidate: false, source: roadmap, note: "D-012: Bondora's price carries Bondora's risk rating"}
+  LoanDuration: {class: application, candidate: true, source: roadmap}
+  MonthlyPayment: {class: application, candidate: false, source: roadmap, note: "D-012: derived from the interest rate"}
+  UseOfLoan: {class: application, candidate: false, source: roadmap, note: "D-009: not collected from 1 June 2017"}
+  Education: {class: application, candidate: true, source: roadmap}
+  EmploymentStatus: {class: application, candidate: false, source: roadmap, note: "D-009: not collected from 1 June 2017"}
+  EmploymentDurationCurrentEmployer: {class: application, candidate: true, source: roadmap}
+  OccupationArea: {class: application, candidate: false, source: roadmap, note: "D-009: not collected from 1 June 2017"}
+  HomeOwnershipType: {class: application, candidate: true, source: roadmap}
+  IncomeFromPrincipalEmployer: {class: application, candidate: true, source: roadmap}
+  IncomeFromPension: {class: application, candidate: true, source: roadmap}
+  IncomeFromFamilyAllowance: {class: application, candidate: true, source: roadmap}
+  IncomeFromSocialWelfare: {class: application, candidate: true, source: roadmap}
+  IncomeFromLeavePay: {class: application, candidate: true, source: roadmap}
+  IncomeFromChildSupport: {class: application, candidate: true, source: roadmap}
+  IncomeOther: {class: application, candidate: true, source: roadmap}
+  IncomeTotal: {class: application, candidate: true, source: roadmap}
+  ExistingLiabilities: {class: application, candidate: true, source: roadmap}
+  LiabilitiesTotal: {class: application, candidate: true, source: roadmap}
+  RefinanceLiabilities: {class: application, candidate: true, source: roadmap}
+  DebtToIncome: {class: application, candidate: true, source: roadmap}
+  FreeCash: {class: application, candidate: true, source: roadmap}
+  ApplicationSignedHour: {class: application, candidate: true, source: roadmap}
+  ApplicationSignedWeekday: {class: application, candidate: true, source: roadmap}
+  NoOfPreviousLoansBeforeLoan: {class: application, candidate: true, source: roadmap}
+  AmountOfPreviousLoansBeforeLoan: {class: application, candidate: true, source: roadmap}
+  PreviousRepaymentsBeforeLoan: {class: application, candidate: false, source: roadmap, note: "D-009: mostly missing from 2018"}
+  PreviousEarlyRepaymentsBefoleLoan: {class: application, candidate: false, source: roadmap, note: "D-009: mostly missing from 2018"}
+  PreviousEarlyRepaymentsCountBeforeLoan: {class: application, candidate: true, source: roadmap}
+  LoanDate: {class: application, candidate: false, source: roadmap, note: "date: used for samples and calendar features, not a raw input"}
+  LoanApplicationStartedDate: {class: application, candidate: false, source: audit, note: "date: used to derive features, not a raw input"}
+  FirstPaymentDate: {class: application, candidate: false, source: audit, note: "date: used to derive features, not a raw input"}
+  MaturityDate_Original: {class: application, candidate: false, source: audit, note: "date: used to derive features, not a raw input"}
+  MonthlyPaymentDay: {class: application, candidate: true, source: audit}
+  WorkExperience: {class: application, candidate: false, source: audit, note: "D-009: not collected from 1 June 2017"}
+  CreditScoreEsMicroL: {class: application, candidate: true, source: audit, note: "D-009: Spanish bureau, judge within country"}
+  CreditScoreEsEquifaxRisk: {class: application, candidate: true, source: audit, note: "D-009: Spanish bureau, judge within country"}
+  CreditScoreFiAsiakasTietoRiskGrade: {class: application, candidate: true, source: audit, note: "D-009: Finnish bureau, judge within country"}
+  CreditScoreEeMini: {class: application, candidate: true, source: audit, note: "D-009: Estonian bureau, judge within country"}
+
+  # ---- protected: Age, gender and family situation: never in the model; used for the fairness analysis.
+  Age: {class: protected, candidate: false, source: roadmap, note: "53 loans with Age 0-2 set to missing at staging (audit step 2)"}
+  Gender: {class: protected, candidate: false, source: roadmap}
+  DateOfBirth: {class: protected, candidate: false, source: roadmap}
+  MaritalStatus: {class: protected, candidate: false, source: roadmap, note: "also not collected from 1 June 2017 (D-009)"}
+  NrOfDependants: {class: protected, candidate: false, source: roadmap, note: "also not collected from 1 June 2017 (D-009)"}
+
+  # ---- personal: Identify a person: dropped at staging, never stored in marts.
+  UserName: {class: personal, candidate: false, source: roadmap}
+  City: {class: personal, candidate: false, source: roadmap}
+  County: {class: personal, candidate: false, source: roadmap}
+  EmploymentPosition: {class: personal, candidate: false, source: roadmap}
+
+  # ---- benchmark: Bondora's own model outputs: used to compare our model with Bondora's, never as inputs.
+  ProbabilityOfDefault: {class: benchmark, candidate: false, source: roadmap}
+  ExpectedLoss: {class: benchmark, candidate: false, source: roadmap}
+  LossGivenDefault: {class: benchmark, candidate: false, source: roadmap}
+  ExpectedReturn: {class: benchmark, candidate: false, source: roadmap}
+  Rating: {class: benchmark, candidate: false, source: roadmap}
+  Rating_V0: {class: benchmark, candidate: false, source: roadmap}
+  Rating_V1: {class: benchmark, candidate: false, source: roadmap}
+  Rating_V2: {class: benchmark, candidate: false, source: roadmap}
+  EL_V0: {class: benchmark, candidate: false, source: roadmap}
+  EL_V1: {class: benchmark, candidate: false, source: roadmap}
+  ModelVersion: {class: benchmark, candidate: false, source: roadmap}
+
+  # ---- outcome: What happened at and after default: target reconciliation and LGD only.
+  Status: {class: outcome, candidate: false, source: roadmap}
+  DefaultDate: {class: outcome, candidate: false, source: roadmap}
+  PrincipalRecovery: {class: outcome, candidate: false, source: roadmap}
+  InterestRecovery: {class: outcome, candidate: false, source: roadmap}
+  EAD1: {class: outcome, candidate: false, source: roadmap}
+  EAD2: {class: outcome, candidate: false, source: roadmap}
+  RecoveryStage: {class: outcome, candidate: false, source: roadmap}
+
+  # ---- leak: The loan's servicing state on the 2021 snapshot date: never a model input.
+  ReportAsOfEOD: {class: leak, candidate: false, source: roadmap}
+  ListedOnUTC: {class: leak, candidate: false, source: roadmap}
+  BiddingStartedOn: {class: leak, candidate: false, source: roadmap}
+  BidsPortfolioManager: {class: leak, candidate: false, source: roadmap}
+  BidsApi: {class: leak, candidate: false, source: roadmap}
+  BidsManual: {class: leak, candidate: false, source: roadmap}
+  ContractEndDate: {class: leak, candidate: false, source: roadmap}
+  MaturityDate_Last: {class: leak, candidate: false, source: roadmap}
+  ActiveScheduleFirstPaymentReached: {class: leak, candidate: false, source: roadmap}
+  PlannedPrincipalTillDate: {class: leak, candidate: false, source: roadmap}
+  PlannedInterestTillDate: {class: leak, candidate: false, source: roadmap}
+  LastPaymentOn: {class: leak, candidate: false, source: roadmap}
+  CurrentDebtDaysPrimary: {class: leak, candidate: false, source: roadmap}
+  CurrentDebtDaysSecondary: {class: leak, candidate: false, source: roadmap}
+  DebtOccuredOn: {class: leak, candidate: false, source: roadmap}
+  DebtOccuredOnForSecondary: {class: leak, candidate: false, source: roadmap}
+  PrincipalOverdueBySchedule: {class: leak, candidate: false, source: roadmap}
+  PlannedPrincipalPostDefault: {class: leak, candidate: false, source: roadmap}
+  PlannedInterestPostDefault: {class: leak, candidate: false, source: roadmap}
+  StageActiveSince: {class: leak, candidate: false, source: roadmap}
+  PrincipalPaymentsMade: {class: leak, candidate: false, source: roadmap}
+  InterestAndPenaltyPaymentsMade: {class: leak, candidate: false, source: roadmap}
+  Restructured: {class: leak, candidate: false, source: audit}
+  ActiveLateCategory: {class: leak, candidate: false, source: audit}
+  WorseLateCategory: {class: leak, candidate: false, source: audit}
+  ActiveLateLastPaymentCategory: {class: leak, candidate: false, source: audit}
+  PrincipalWriteOffs: {class: leak, candidate: false, source: audit}
+  InterestAndPenaltyWriteOffs: {class: leak, candidate: false, source: audit}
+  PrincipalBalance: {class: leak, candidate: false, source: audit}
+  InterestAndPenaltyBalance: {class: leak, candidate: false, source: audit}
+  GracePeriodStart: {class: leak, candidate: false, source: audit}
+  GracePeriodEnd: {class: leak, candidate: false, source: audit}
+  NextPaymentDate: {class: leak, candidate: false, source: audit}
+  NextPaymentNr: {class: leak, candidate: false, source: audit}
+  NrOfScheduledPayments: {class: leak, candidate: false, source: audit}
+  ReScheduledOn: {class: leak, candidate: false, source: audit}
+  PrincipalDebtServicingCost: {class: leak, candidate: false, source: audit}
+  InterestAndPenaltyDebtServicingCost: {class: leak, candidate: false, source: audit}
+
+# Engineered features (added in Phase 3). Each one lists the raw columns it is computed from;
+# the registry checks that every input is a candidate, so a leak cannot sneak in through a
+# derived feature. Example:
+#   instalment_to_income: {inputs: [Amount, LoanDuration, IncomeTotal], note: "..."}
+derived: {}
