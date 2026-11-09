@@ -55,8 +55,35 @@ def test_d012_price_fields_are_excluded(reg, name):
     assert "D-012" in reg.columns[name].note
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "IncomeFromPrincipalEmployer",
+        "IncomeFromPension",
+        "IncomeFromFamilyAllowance",
+        "IncomeFromSocialWelfare",
+        "IncomeFromLeavePay",
+        "IncomeFromChildSupport",
+        "IncomeOther",
+        "DebtToIncome",
+        "FreeCash",
+        "RefinanceLiabilities",
+    ],
+)
+def test_d015_zero_coded_fields_are_excluded(reg, name):
+    assert not reg.columns[name].candidate
+    assert "D-015" in reg.columns[name].note
+
+
+def test_d016_language_is_protected(reg):
+    col = reg.columns["LanguageCode"]
+    assert col.cls == "protected" and not col.candidate
+    assert "D-016" in col.note
+
+
 def test_core_application_features_are_candidates(reg):
-    for name in ["Amount", "LoanDuration", "IncomeTotal", "DebtToIncome", "Country", "Education"]:
+    core = ["Amount", "LoanDuration", "IncomeTotal", "ExistingLiabilities", "Country", "Education"]
+    for name in core:
         assert reg.columns[name].candidate, name
 
 

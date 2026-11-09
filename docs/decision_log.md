@@ -18,6 +18,10 @@ A running record of the modelling and engineering choices in this project, why t
 | D-012 | 2026-11-04 | Accepted |
 | D-013 | 2026-11-04 | Accepted |
 | D-014 | 2026-11-04 | Accepted |
+| D-015 | 2026-11-09 | Accepted |
+| D-016 | 2026-11-09 | Accepted |
+| D-017 | 2026-11-09 | Accepted |
+| D-018 | 2026-11-09 | Accepted |
 
 ---
 
@@ -164,6 +168,81 @@ Every Estonian and Finnish loan also carries the plain code `M` in `CreditScoreE
 **Rejected.** Keeping them with a "missing" bin (teaches the issue period, the problem D-009 exists to prevent). Imputing a Spanish score for 2020 loans (nothing to impute from).
 
 **Revisit if.** A newer feature extract has Spanish bureau scores for 2020 loans.
+
+
+## D-015 Ten income and affordability fields coded 0 after June 2017 are removed from the candidates
+
+**Context.** D-009 removed features that are empty or `-1` in the out-of-time window. Before binning (Phase 3), the candidates were checked for a third way of saying "not collected": the value `0`. From June 2017, when Bondora changed its application form (D-009), ten fields are `0` for every loan, and in the out-of-time sample each has a single value:
+
+| Field | Zero before June 2017 | Zero June 2017 to 2019 | Zero out-of-time |
+|---|---|---|---|
+| `IncomeFromPrincipalEmployer` | 6.7% | 100% | 100% |
+| `IncomeFromPension` | 87.3% | 100% | 100% |
+| `IncomeFromFamilyAllowance` | 82.0% | 100% | 100% |
+| `IncomeFromSocialWelfare` | 93.5% | 100% | 100% |
+| `IncomeFromLeavePay` | 97.7% | 100% | 100% |
+| `IncomeFromChildSupport` | 95.4% | 100% | 100% |
+| `IncomeOther` | 85.9% | 100% | 100% |
+| `DebtToIncome` | 0.0% | 100% | 100% |
+| `FreeCash` | 0.0% | 100% | 100% |
+| `RefinanceLiabilities` | 78.6% | 100% | 100% |
+
+`IncomeTotal` stays filled in for every loan in every period, so Bondora kept the total and stopped storing the breakdown and the affordability ratios.
+
+**Decision.** Set `candidate: false` for the ten fields, with the note "D-015: always 0 from June 2017". `IncomeTotal`, `ExistingLiabilities` and `LiabilitiesTotal` stay candidates. An affordability ratio can be rebuilt later as a derived feature from candidate inputs (for example instalment or liabilities relative to `IncomeTotal`).
+
+**Why.** Same reasoning as D-009: a field with one value in the out-of-time sample cannot help the model there, and in development its `0` group would mostly mean "issued after June 2017", teaching the model the calendar instead of borrower risk. The audit's missing-value check counted only empty and `-1`, so these zeros passed it.
+
+**Rejected.** Treating `0` as missing and keeping the fields (they would still be missing for every recent loan). Rebuilding `DebtToIncome` from the dropped parts (the parts are gone too).
+
+**Watch.** `ExistingLiabilities` and `LiabilitiesTotal` are never 0 before June 2017 but 0 for about 25% of loans afterwards, so their definition may have changed with the form. They stay in, and notebook 04 checks whether their bins behave the same before and after June 2017.
+
+
+## D-016 LanguageCode is a protected attribute, not a scorecard candidate
+
+**Context.** `LanguageCode` was an application candidate. In the train sample it almost duplicates `Country` (WoE correlation 0.98): code 1 (Estonian) and 3 (Russian) are used in Estonia, 4 (Finnish) in Finland, 6 (Spanish) in Spain. The only thing it adds beyond country is inside Estonia, where Russian-speaking borrowers default more often than Estonian speakers (23.4% against 17.7%; notebook 04, step 6a).
+
+**Decision.** Reclassify `LanguageCode` as `protected` (`candidate: false`). Use it, like `Age` and `Gender`, only in the Phase 4 fairness analysis.
+
+**Why.** In Estonia, the language a borrower speaks is closely tied to ethnic origin. A scorecard that gives Russian speakers fewer points would price borrowers by ethnicity, which EU non-discrimination law forbids and the EU AI Act treats as a key risk for credit scoring (a high-risk use). Everything legitimate it carries (the country) is already in `country_bureau_grade`.
+
+**Rejected.** Keeping it because it is "known at application" (being known is necessary, not sufficient). Dropping it from the data entirely (it is needed to test whether the final scores still differ by language).
+
+## D-017 Two derived features: country_bureau_grade and income_vs_country_median
+
+**Context.** Two pooled raw features mislead (notebook 04, steps 1 and 5). Each credit-bureau score exists only for its own country, so pooled most of its bins only say "not this country". Raw `IncomeTotal` ranks risk the wrong way (more income, more default: 22% to 37%) because Finnish incomes are about twice Estonian ones and Finland defaults more; inside Estonia and Spain more income means slightly less default (Simpson's paradox).
+
+**Decision.** Add two derived features in `src/pdengine/features.py`, registered under `derived:` in `config/feature_registry.yaml`:
+
+* `country_bureau_grade` (inputs `Country`, `CreditScoreEeMini`, `CreditScoreFiAsiakasTietoRiskGrade`): `EE_<Estonian grade>`, `FI_<Finnish grade>`, or the country code where no bureau score is usable (`ES`, D-014). Train IV 0.57, the strongest feature.
+* `income_vs_country_median` (inputs `IncomeTotal`, `Country`): income divided by the train median of the country (Estonia 1,000, Spain 1,350, Finland 2,036). The medians are frozen in the code and checked against the train sample in notebook 04. Train IV 0.022; more income means less default inside every country.
+
+When a derived feature is shortlisted, its raw inputs are not (D-018).
+
+**Why.** One feature then carries the country risk and the bureau grade within each country, without three near-duplicate features in the model (correlations 0.85 to 0.95). Income relative to the country is the version whose direction a credit officer can defend.
+
+**Rejected.** Pooled bureau scores next to `Country` (collinear, and most bins only repeat the country). Raw `IncomeTotal` (wrong direction). Separate scorecards per country (Spain and Finland are too small in the out-of-time sample, and Spain has no out-of-time period after March 2020).
+
+## D-018 Feature selection rules and the scorecard shortlist
+
+**Context.** Notebook 04 bins all 22 features on the train sample (optbinning, at least 5% of loans per bin, monotonic trends for numeric features except application hour and payment day). The out-of-time sample stays blind: only its feature distributions (PSI) are used, never its default outcomes.
+
+**Decision.** A feature enters the shortlist only if it passes, in this order:
+
+1. Train IV at least 0.02 (IV above 0.5 is checked for leakage first).
+2. PSI from train to out-of-time at most 0.25.
+3. Its pattern holds inside each country: median within-country Spearman correlation between bin WoE and bin default rate of -0.5 or lower (country features exempt).
+4. A shortlisted derived feature replaces its raw inputs.
+5. From the highest IV down, WoE correlation at most 0.7 with every feature already kept.
+6. VIF below 5.
+
+**Result.** Seven features: `country_bureau_grade`, `NoOfPreviousLoansBeforeLoan`, `HomeOwnershipType`, `ExistingLiabilities`, `AppliedAmount`, `Education`, `income_vs_country_median` (VIF 1.03 to 1.87). Dropped: `IncomeTotal` and `MonthlyPaymentDay` (country effect), `VerificationType` (PSI 0.71) and `LoanDuration` (PSI 0.28), four features below IV 0.02, the three inputs of `country_bureau_grade`, and four duplicates (`Amount`, `AmountOfPreviousLoansBeforeLoan`, `NewCreditCustomer`, `LiabilitiesTotal`).
+
+**Why.** Each rule removes a known failure: noise (1), features whose population has moved (2), country effects that look like borrower risk (3), and unstable or unexplainable coefficients from near-duplicates (4 to 6). Keeping the out-of-time outcomes out of selection keeps the out-of-time test independent.
+
+**Rejected.** Choosing features by out-of-time IV (would tune the model to its own test). Automatic selection without the within-country rule (would have kept raw income with the wrong sign and payment day with no meaning).
+
+**Revisit.** `Education` and `income_vs_country_median` (IV about 0.02) stay only if their coefficients have the expected sign and are significant in notebook 05.
 
 ---
 

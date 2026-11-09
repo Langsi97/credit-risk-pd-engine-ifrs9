@@ -26,7 +26,7 @@ columns:
   # ---- application: Known on the day the loan is decided. Only these can be model candidates.
   NewCreditCustomer: {class: application, candidate: true, source: roadmap}
   VerificationType: {class: application, candidate: true, source: roadmap}
-  LanguageCode: {class: application, candidate: true, source: roadmap}
+  LanguageCode: {class: protected, candidate: false, source: roadmap, note: "D-016: proxy for ethnicity (language spoken); used for the fairness analysis"}
   Country: {class: application, candidate: true, source: roadmap, note: "D-008: Slovakia kept in the pool, country is a candidate"}
   AppliedAmount: {class: application, candidate: true, source: roadmap}
   Amount: {class: application, candidate: true, source: roadmap}
@@ -39,19 +39,19 @@ columns:
   EmploymentDurationCurrentEmployer: {class: application, candidate: true, source: roadmap}
   OccupationArea: {class: application, candidate: false, source: roadmap, note: "D-009: not collected from 1 June 2017"}
   HomeOwnershipType: {class: application, candidate: true, source: roadmap}
-  IncomeFromPrincipalEmployer: {class: application, candidate: true, source: roadmap}
-  IncomeFromPension: {class: application, candidate: true, source: roadmap}
-  IncomeFromFamilyAllowance: {class: application, candidate: true, source: roadmap}
-  IncomeFromSocialWelfare: {class: application, candidate: true, source: roadmap}
-  IncomeFromLeavePay: {class: application, candidate: true, source: roadmap}
-  IncomeFromChildSupport: {class: application, candidate: true, source: roadmap}
-  IncomeOther: {class: application, candidate: true, source: roadmap}
+  IncomeFromPrincipalEmployer: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  IncomeFromPension: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  IncomeFromFamilyAllowance: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  IncomeFromSocialWelfare: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  IncomeFromLeavePay: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  IncomeFromChildSupport: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  IncomeOther: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
   IncomeTotal: {class: application, candidate: true, source: roadmap}
   ExistingLiabilities: {class: application, candidate: true, source: roadmap}
   LiabilitiesTotal: {class: application, candidate: true, source: roadmap}
-  RefinanceLiabilities: {class: application, candidate: true, source: roadmap}
-  DebtToIncome: {class: application, candidate: true, source: roadmap}
-  FreeCash: {class: application, candidate: true, source: roadmap}
+  RefinanceLiabilities: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  DebtToIncome: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
+  FreeCash: {class: application, candidate: false, source: roadmap, note: "D-015: always 0 from June 2017"}
   ApplicationSignedHour: {class: application, candidate: true, source: roadmap}
   ApplicationSignedWeekday: {class: application, candidate: true, source: roadmap}
   NoOfPreviousLoansBeforeLoan: {class: application, candidate: true, source: roadmap}
@@ -149,4 +149,10 @@ columns:
 # the registry checks that every input is a candidate, so a leak cannot sneak in through a
 # derived feature. Example:
 #   instalment_to_income: {inputs: [Amount, LoanDuration, IncomeTotal], note: "..."}
-derived: {}
+derived:
+  country_bureau_grade:
+    inputs: [Country, CreditScoreEeMini, CreditScoreFiAsiakasTietoRiskGrade]
+    note: "D-017: country plus that country's bureau grade (pdengine.features)"
+  income_vs_country_median:
+    inputs: [IncomeTotal, Country]
+    note: "D-017: IncomeTotal relative to the train median of the country (pdengine.features)"
