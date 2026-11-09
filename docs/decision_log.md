@@ -22,6 +22,7 @@ A running record of the modelling and engineering choices in this project, why t
 | D-016 | 2026-11-09 | Accepted |
 | D-017 | 2026-11-09 | Accepted |
 | D-018 | 2026-11-09 | Accepted |
+| D-019 | 2026-11-09 | Accepted |
 
 ---
 
@@ -243,6 +244,33 @@ When a derived feature is shortlisted, its raw inputs are not (D-018).
 **Rejected.** Choosing features by out-of-time IV (would tune the model to its own test). Automatic selection without the within-country rule (would have kept raw income with the wrong sign and payment day with no meaning).
 
 **Revisit.** `Education` and `income_vs_country_median` (IV about 0.02) stay only if their coefficients have the expected sign and are significant in notebook 05.
+
+
+## D-019 Champion scorecard: six features, logistic regression on WoE, 600 points at 30:1 and PDO 20
+
+**Context.** Notebook 05 fits a logistic regression of the 12-month default flag on the WoE values of the seven features shortlisted in D-018 (train sample only). The roadmap requires every coefficient to have the expected sign; with WoE positive for safer bins, that sign is negative.
+
+**Decision.**
+* Remove `ExistingLiabilities`: its coefficient is +0.06 with p = 0.15 once `NoOfPreviousLoansBeforeLoan` and `HomeOwnershipType` are in the model (WoE correlation 0.62 with the previous-loan count).
+* The champion is the refit on six features: `country_bureau_grade`, `NoOfPreviousLoansBeforeLoan`, `HomeOwnershipType`, `AppliedAmount`, `Education`, `income_vs_country_median`. All coefficients are negative with p < 0.001, and a refit on the test sample gives the same signs.
+* Points: 600 points at good:bad odds of 30:1, 20 points to double the odds (Siddiqi, chapter 11). The intercept is spread evenly over the features. Train scores run from 484 to 572.
+* Saved to `data/processed/scorecard.json` (coefficients, scaling, points table); the bins stay in `binning_process.pkl`.
+
+**Results (for the record, not used to change the model).**
+
+| Sample | Gini (95% bootstrap) | KS | Bondora PD Gini | Mean PD / observed |
+|---|---|---|---|---|
+| Train | 0.443 | 0.345 | 0.418 | 31.4% / 31.4% |
+| Test | 0.440 (0.428 to 0.452) | 0.340 | 0.418 | 31.4% / 31.4% |
+| Out-of-time | 0.349 (0.336 to 0.364) | 0.252 | 0.405 | 27.0% / 14.4% |
+
+Paired difference with Bondora's PD: +0.022 on test (0.012 to 0.033), -0.056 out of time (-0.075 to -0.038). The out-of-time drop is mainly the collapse of the country gap (Finland's default rate fell from 42% to 14%); within Estonia the Gini rose from 0.21 to 0.31.
+
+**Why.** A positive coefficient on a WoE feature contradicts the feature's own bins and makes the points unexplainable; the removed feature adds nothing once the others are in. The scaling is the common industry convention and changes no ranking.
+
+**Rejected.** Keeping `ExistingLiabilities` with a wrong-sign weight. Changing features after seeing the out-of-time results (would end the independence of the out-of-time test).
+
+**Open.** The out-of-time PDs are about 1.9 times the observed rate: recalibrate per country before any decision or ECL use (roadmap D10, Phase 4). `Education` has the least stable weight (-0.34 on train, -0.23 on test).
 
 ---
 
