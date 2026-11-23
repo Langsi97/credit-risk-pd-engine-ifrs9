@@ -449,6 +449,32 @@ Over eight seeds, the six core features are chosen every time. Education also en
 
 **Watch.** Notebooks 04 and 05 import pandas before `optbinning` and run without problems in VS Code, so the crash depends on what else the process has loaded. If a new script or notebook crashes the same way on Windows, import `cvxpy` first.
 
+## D-027 Keep the scorecard as champion and LightGBM as challenger
+
+**Context.** D-024 promised a challenger to show whether the scorecard leaves performance on the table, and why. Notebook 06 builds LightGBM on the same samples, target and registry guard, with monotone constraints on 10 features whose direction is fixed by economics. Settings were chosen by forward-chaining validation inside train (fit up to 2017, validate on 2018; fit up to 2018, validate on 2019), with early stopping. Test and out-of-time were scored once.
+
+**Decision.** The WoE scorecard stays champion. LightGBM on the 24 candidate features (15 leaves, at least 200 loans per leaf, 74 trees) is kept as challenger in `data/processed/challenger_lgbm.txt`, for monitoring and for Phase 4.
+
+**Evidence.**
+
+| Model | Test Gini | OOT Gini |
+|---|---|---|
+| Champion scorecard | 0.459 | 0.368 |
+| LightGBM, 6 champion features | 0.486 | 0.411 |
+| LightGBM, 24 candidates | 0.502 | 0.419 |
+| Bondora PD | 0.414 | 0.405 |
+
+* Both challengers beat the champion out of time (paired bootstrap 95%: +0.038 to +0.048 and +0.045 to +0.056). Neither is significantly above Bondora (+0.006 and +0.014, both intervals include zero).
+* The gain is interactions, not finer shapes. A LightGBM with interactions forbidden equals the scorecard (0.458 / 0.363). The strongest pairs all involve `country_bureau_grade` (with AppliedAmount and the two history features), concentrated in Finland: OOT Finland Gini 0.154 for the scorecard, 0.313 for the challenger.
+* Learning curve: the scorecard is flat from 10% of train; LightGBM is still rising at 100%.
+* D-012 sensitivity, analysis only and never saved: adding `Interest` lifts the scorecard to 0.481 / 0.476 and LightGBM to 0.523 / 0.504; the interest rate alone gives 0.437 / 0.396. The rate carries Bondora's risk view, so D-012 stands.
+* Forcing `Education` in gives 0.462 / 0.368, so D-023 stands.
+* Every model over-predicts out of time (mean PD about 0.26 against an observed 0.144).
+
+**Rejected.** Promoting LightGBM to champion: its advantage comes from one identifiable source, country interactions, which a segmented scorecard can capture while keeping a points table and reason codes.
+
+**Watch.** Phase 4: build a country-segmented scorecard (Finland on its own; Spain stays pooled, D-024) and measure how much of the gap it closes; explain the challenger with SHAP; recalibrate both models; track the challenger's lead over the champion in monitoring.
+
 ---
 
 ## Template
