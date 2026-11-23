@@ -18,6 +18,7 @@ import json
 import sys
 from pathlib import Path
 
+import cvxpy  # noqa: F401  load before pandas/pyarrow on Windows (D-026)
 import duckdb
 import pandas as pd
 

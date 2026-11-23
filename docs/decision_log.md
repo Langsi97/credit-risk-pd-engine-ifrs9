@@ -29,6 +29,7 @@ A running record of the modelling and engineering choices in this project, why t
 | D-023 | 2026-11-23 | Accepted |
 | D-024 | 2026-11-23 | Accepted |
 | D-025 | 2026-11-23 | Accepted |
+| D-026 | 2026-11-23 | Accepted |
 
 ---
 
@@ -431,6 +432,22 @@ Over eight seeds, the six core features are chosen every time. Education also en
 **Evidence.** A clean environment with every pinned requirement passes `pip check`, imports all libraries with the crash handler on, and passes the full test suite (89 tests).
 
 **Rejected.** Changing the import order (fragile, and the cause is inside `osqp`). Removing `osqp` (`cvxpy` declares it as a dependency).
+
+
+## D-026 Load the solver libraries before pandas so tests and training run on Windows
+
+**Context.** With the D-025 pins installed, `pytest` still crashed on Windows, now when `osqp` loaded its compiled module. The real cause is the Microsoft C++ runtime. Several packages ship their own `msvcp140.dll`: pyarrow's is version 14.28, while numpy, scikit-learn and highspy ship 14.40. pandas imports pyarrow on import, and whichever copy loads first is used by every later compiled library in the process. When pandas loaded first, `cvxpy`'s compiled core and `osqp` crashed with an access violation. A plain `import cvxpy, optbinning` worked because it loaded the solvers before pandas.
+
+**Decision.**
+* `tests/conftest.py` imports `cvxpy` and `optbinning` before any test module.
+* `pdengine/train.py` imports `cvxpy` before `duckdb` and pandas.
+* The D-025 pins stay: `osqp` 0.6.7 also avoids its MKL probe.
+
+**Evidence.** On Windows, the full suite passes after the change (89 tests).
+
+**Rejected.** Deleting or replacing bundled DLLs (breaks the packages and comes back with every install). Upgrading pyarrow (not pinned directly; its runtime version is outside the project's control).
+
+**Watch.** Notebooks 04 and 05 import pandas before `optbinning` and run without problems in VS Code, so the crash depends on what else the process has loaded. If a new script or notebook crashes the same way on Windows, import `cvxpy` first.
 
 ---
 
