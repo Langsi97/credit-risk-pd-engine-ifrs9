@@ -61,3 +61,36 @@ COUNTRY_FEATURES = [
 # ---------------------------------------------------------------- scorecard (D-021)
 MAX_P_VALUE = 0.05
 BASE_SCORE, BASE_ODDS, PDO = 600, 30, 20  # 600 points = good:bad odds 30:1, 20 points to double
+
+# ---------------------------------------------------------------- champion v2 (notebook 07, D-028)
+# A dummy-coded logistic scorecard: one coefficient per bin, constrained so the points follow
+# the risk order of the bins (logical by construction). It uses every feature that passes the
+# stability and logic screens (no IV, correlation or VIF rule: those protect a one-coefficient
+# WoE model; the joint, penalised and constrained fit handles overlap itself).
+V2_MIN_BIN_SIZE = 0.02  # finer bins than v1: at least 2% of train loans per bin
+V2_MIN_PREBIN_SIZE = 0.01  # optbinning's default pre-bins (5%, at most 20) cap the resolution
+V2_MAX_N_PREBINS = 100
+# Interaction characteristics (Siddiqi): these features are binned inside each country,
+# because loan size and borrowing history mean different things in Estonia, Finland and Spain.
+CROSS_FEATURES = {
+    "AppliedAmount": "auto_asc_desc",
+    "days_since_last_loan": "descending",
+    "days_since_first_loan": "descending",
+}
+CROSS_COUNTRIES = ["EE", "FI", "ES"]
+CROSS_MIN_BIN_SIZE = 0.05  # share of the country's train loans
+CROSS_MIN_PREBIN_SIZE = 0.02
+CROSS_MAX_N_PREBINS = 50
+L2_PENALTY = 1e-4  # ridge penalty on the bin coefficients (per loan, mean log-loss scale)
+
+# ---------------------------------------------------------------- challengers (notebook 06, D-029)
+# Monotone constraints kept only where economics fixes the direction AND the train data agree.
+# Dropped (D-029): AppliedAmount/Amount (risk is not monotone in loan size and differs by
+# country), days_since_last_loan (risk rises again after long gaps), the liabilities fields.
+MONOTONE = {
+    "days_since_first_loan": -1,
+    "NoOfPreviousLoansBeforeLoan": -1,
+    "AmountOfPreviousLoansBeforeLoan": -1,
+    "NewCreditCustomer": 1,
+    "income_vs_country_median": -1,
+}

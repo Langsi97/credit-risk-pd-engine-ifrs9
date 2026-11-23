@@ -200,7 +200,36 @@ def test_pipeline_end_to_end(tmp_path):
     result = run(S.DB_PATH, tmp_path, rebuild_samples=True)
     card = result["scorecard"]
     assert all(c < 0 for c in card.coefficients.values())  # every weight has the expected sign
-    assert result["metrics"]["test"]["gini"] > 0.40
-    assert result["metrics"]["oot"]["gini"] > 0.35  # roadmap target
-    for f in ["model_samples.parquet", "binning_process.pkl", "scorecard.json"]:
+    v1, v2 = result["metrics"]["v1_woe_scorecard"], result["metrics"]["champion_v2"]
+    assert v1["test"]["gini"] > 0.40
+    assert v1["oot"]["gini"] > 0.35  # roadmap target
+    assert v2["test"]["gini"] > v1["test"]["gini"]  # D-028: v2 must beat v1 on test
+    assert result["champion_v2"].card.order_violations() == []
+    for f in ["model_samples.parquet", "binning_process.pkl", "scorecard.json", "champion_v2.pkl"]:
         assert (tmp_path / f).exists()
+
+
+def test_screens_keep_weak_features_and_drop_derived_inputs():
+    from types import SimpleNamespace
+
+    from pdengine.selection import screen_features
+
+    n = 6000
+    country = pd.Series(RNG.choice(["EE", "FI"], n))
+    signal = pd.Series(RNG.normal(size=n))
+    y = pd.Series((RNG.random(n) < 1 / (1 + np.exp(-(signal - 0.8)))).astype(int))
+    X = pd.DataFrame(
+        {
+            "signal": signal,
+            "weak": RNG.normal(size=n) + 0.05 * signal,  # tiny IV: v1 would drop it, v2 keeps it
+            "raw": signal + RNG.normal(scale=0.1, size=n),
+            "derived": signal,
+        }
+    )
+    sample = pd.Series(np.where(RNG.random(n) < 0.7, "train", "oot"))
+    bp = fit_bins(X[sample.eq("train")], y[sample.eq("train")])
+    reg = SimpleNamespace(derived={"derived": ["raw"]})  # only .derived is used
+    sel = screen_features(bp, X, y, sample, country, reg)
+    assert "weak" in sel.shortlist and "signal" in sel.shortlist
+    assert "raw" not in sel.shortlist
+    assert sel.table.loc["raw", "reason"] == "input of derived"

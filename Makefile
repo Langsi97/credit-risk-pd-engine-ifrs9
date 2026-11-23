@@ -11,7 +11,7 @@ help:
 	@echo "data       download Bondora data (official feed + Kaggle snapshot) to data/raw/"
 	@echo "warehouse  convert raw files to Parquet and build the DuckDB warehouse"
 	@echo "samples    exclusions waterfall and train/test/out-of-time samples"
-	@echo "train      samples, bins, feature selection and the WoE logistic scorecard"
+	@echo "train      samples, bins, the v1 WoE scorecard and champion v2 (logical scorecard)"
 	@echo "ecl        compute 12-month PD x LGD x EAD under baseline, adverse, severe"
 	@echo "report     build the model documentation and scenario tables in reports/"
 	@echo "serve      start the FastAPI /score endpoint locally"
