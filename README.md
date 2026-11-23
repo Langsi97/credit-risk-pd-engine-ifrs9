@@ -42,28 +42,41 @@ The project is considered successful when the following outcomes are met:
 | Preliminary EDA and data audit ([01](notebooks/01_preliminary_eda.ipynb), [02](notebooks/02_data_audit.ipynb), [data card](docs/data_card.md)) | Done |
 | Leakage registry, target and out-of-time samples ([03](notebooks/03_target_and_samples.ipynb)) | Done |
 | Binning, WoE, IV and feature selection ([04](notebooks/04_binning_woe_iv.ipynb)) | Done |
-| Champion WoE logistic scorecard ([05](notebooks/05_scorecard.ipynb), `make train`) | Done |
-| LightGBM challenger and benchmark comparison | Next |
-| Recalibration, risk grades, cut-off and profit analysis, fairness check | Planned |
+| First scorecard: WoE logistic regression, v1 ([05](notebooks/05_scorecard.ipynb)) | Done |
+| Challengers: LightGBM, CatBoost, Explainable Boosting Machine ([06](notebooks/06_challenger.ipynb)) | Done |
+| **Champion v2: logical dummy scorecard with country-specific bins** ([07](notebooks/07_champion_v2.ipynb), `make train`) | Done |
+| Recalibration, risk grades, cut-off and profit analysis, fairness check | Next |
 | IFRS 9 ECL under macro scenarios (`make ecl`) | Planned |
 | Model documentation report (`make report`) and FastAPI service (`make serve`) | Planned |
 
 ## Results so far
 
-Champion scorecard: a logistic regression on the weight of evidence of six features, scaled to points (600 points at good:bad odds of 30:1, 20 points to double the odds). Features: country with its credit-bureau grade, customer tenure, time since the last loan, home ownership, amount applied for, and income relative to the country median ([D-021 to D-023](docs/decision_log.md)).
+**Champion v2** ([notebook 07](notebooks/07_champion_v2.ipynb), [D-028](docs/decision_log.md)): a logistic regression with one coefficient per bin, scaled to points (600 points at good:bad odds of 30:1, 20 points to double the odds). Ten characteristics:
+* country with its credit-bureau grade;
+* customer tenure, time since the last loan and amount applied for, each binned **inside each country**;
+* number and amount of previous loans;
+* home ownership, education and income relative to the country median;
+* the hour the application was signed.
+
+The fit is constrained so that a safer bin never gets fewer points (logical by construction). Every decline gets reason codes.
 
 | Gini | Test, 2016 to 2019 (32,273 loans) | Out-of-time, 2020 to Jul 2021 (48,150 loans) |
 |---|---|---|
 | Baseline: country alone | 0.377 | 0.220 |
 | Baseline: country and its bureau grade | 0.409 | 0.293 |
-| **Champion scorecard** (95% bootstrap) | **0.459** (0.448 to 0.471) | **0.368** (0.353 to 0.382) |
+| First scorecard, v1 (WoE, 6 features) | 0.459 | 0.368 |
+| **Champion v2** | **0.480** | **0.401** |
+| Challenger: Explainable Boosting Machine (glass box) | 0.513 | 0.426 |
+| Benchmark: LightGBM, 24 candidates (tuned) | 0.515 | 0.439 |
+| Benchmark: CatBoost, 24 candidates | 0.516 | 0.449 |
 | Bondora's own PD | 0.414 | 0.405 |
 
-* Beyond the country and its bureau grade, the other features add 0.05 of Gini on test and 0.08 out of time.
-* On the test sample the scorecard ranks borrowers better than Bondora's own model (paired difference +0.045, interval 0.034 to 0.055).
-* Out of time it meets the 0.35 target but Bondora's model holds up better (difference -0.037). The main reason: Finland's default rate fell from 42% to 14% after 2019, so the gap between countries, the scorecard's strongest signal, shrank ([notebook 05](notebooks/05_scorecard.ipynb), step 6).
-* Repeating the whole pipeline with eight random seeds selects the same six core features every time; the out-of-time Gini stays between 0.358 and 0.368 ([D-022, D-023](docs/decision_log.md)).
-* Out of time the predicted default rates are about 1.9 times too high (27% predicted, 14% observed), so the PDs must be recalibrated before any use. That is the next phase.
+* **Champion v2 vs v1:** v2 beats v1 by +0.021 test and +0.033 out of time (paired bootstrap intervals well above zero). The gain is largest in Finland: out-of-time Gini rises from 0.15 to 0.29.
+* **Champion v2 vs Bondora:** out of time, v2 matches Bondora's own model (difference −0.004, interval −0.021 to +0.014). v2 uses no interest rate and no repayment history ([D-012](docs/decision_log.md)).
+* **Why v1 lost:** notebook 06 shows the challengers' lead came mostly from finer, jointly fitted feature shapes and from features v1's selection rules had removed. Interactions mattered less. Champion v2 fixes those causes inside a scorecard ([D-029](docs/decision_log.md) corrects the first version of that analysis).
+* **Challengers vs Bondora:** all three challengers beat Bondora's model out of time. The glass-box EBM is level with the black boxes on test.
+* **Seed stability:** repeating the v1 pipeline with eight random seeds selects the same core features every time ([D-022, D-023](docs/decision_log.md)).
+* **Calibration:** out of time, every model predicts about 26% default against 14% observed, so the PDs must be recalibrated before any use. That is the next phase. Finland's 2019–2020 break coincides with its national consumer-credit interest cap.
 
 ## What this project does not do, and why
 
@@ -72,7 +85,7 @@ The work follows Siddiqi (*Intelligent Credit Scoring*), Baesens et al. (*Credit
 * **No reject inference.** The data hold only funded loans, so the scorecard ranks the population Bondora accepted, not every applicant.
 * **No credit bureau detail.** Inquiries, other lenders' trades and their payment history are not published. There is only one bureau grade per country, and the Spanish ones are unusable after 2019.
 * **Little customer behaviour.** The data describe loans, not accounts. Customer tenure and time since the last loan are what the loan history allows.
-* **No separate country scorecards.** Spain has only one quarter of out-of-time lending.
+* **No separate country scorecards.** Spain has only one quarter of out-of-time lending, and a separate Finland scorecard did not help; country-specific bins inside one scorecard work better (D-028).
 * **No validation on recent applicants.** Application fields stop in July 2021.
 
 Each item, its source and its reason are listed in [decision D-024](docs/decision_log.md).

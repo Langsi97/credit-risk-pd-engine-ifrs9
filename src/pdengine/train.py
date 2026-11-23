@@ -1,6 +1,7 @@
-"""Track A pipeline: warehouse -> samples -> bins -> feature selection -> champion scorecard.
+"""Track A pipeline: warehouse -> samples -> bins -> the v1 WoE scorecard and champion v2.
 
-Reproduces notebooks 03, 04 and 05 without the notebooks.
+Reproduces notebooks 03, 04, 05 (v1 WoE scorecard) and 07 (champion v2, the logical dummy
+scorecard, D-028) without the notebooks.
 
 Usage
 -----
@@ -8,13 +9,15 @@ Usage
     python -m pdengine.train --rebuild-samples   # rebuild the samples from the warehouse first
 
 Writes to data/processed/: model_samples.parquet (if rebuilt), binning_process.pkl,
-scorecard_shortlist.json, feature_selection.csv, scorecard.json and train_metrics.json.
+scorecard_shortlist.json, feature_selection.csv, scorecard.json (v1), champion_v2.pkl,
+champion_v2.json, champion_v2_points.csv and train_metrics.json (both models).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import pickle
 import sys
 from pathlib import Path
 
@@ -24,6 +27,7 @@ import pandas as pd
 
 from pdengine import samples as samples_mod
 from pdengine import settings as S
+from pdengine.champion import fit_champion
 from pdengine.dataset import load_model_data
 from pdengine.registry import load_registry
 from pdengine.scorecard import brier, check_logical_points, fit_scorecard, gini, ks
@@ -52,19 +56,28 @@ def run(db: Path = S.DB_PATH, out_dir: Path = S.PROCESSED, rebuild_samples: bool
     card.build_points(bp)
     check_logical_points(bp, card)  # D-023
 
-    pd_hat = card.predict_pd(woe)
+    v2 = fit_champion(data.X, data.y, data.sample, data.country, reg)  # D-028
+    if v2.card.order_violations():
+        raise ValueError(f"champion v2 points break the risk order: {v2.card.order_violations()}")
+
+    predictions = {
+        "v1_woe_scorecard": card.predict_pd(woe),
+        "champion_v2": v2.predict_pd(data.X, data.country),
+    }
     metrics = {}
-    for name in ["train", "test", "oot"]:
-        m = data.sample.eq(name)
-        metrics[name] = {
-            "loans": int(m.sum()),
-            "gini": round(gini(data.y[m], pd_hat[m]), 4),
-            "ks": round(ks(data.y[m], pd_hat[m]), 4),
-            "brier": round(brier(data.y[m], pd_hat[m]), 4),
-            "gini_bondora_pd": round(gini(data.y[m], data.bondora_pd[m]), 4),
-            "mean_pd": round(float(pd_hat[m].mean()), 4),
-            "default_rate": round(float(data.y[m].mean()), 4),
-        }
+    for model, pd_hat in predictions.items():
+        metrics[model] = {}
+        for name in ["train", "test", "oot"]:
+            m = data.sample.eq(name)
+            metrics[model][name] = {
+                "loans": int(m.sum()),
+                "gini": round(gini(data.y[m], pd_hat[m]), 4),
+                "ks": round(ks(data.y[m], pd_hat[m]), 4),
+                "brier": round(brier(data.y[m], pd_hat[m]), 4),
+                "gini_bondora_pd": round(gini(data.y[m], data.bondora_pd[m]), 4),
+                "mean_pd": round(float(pd_hat[m].mean()), 4),
+                "default_rate": round(float(data.y[m].mean()), 4),
+            }
 
     out_dir.mkdir(parents=True, exist_ok=True)
     bp.save(str(out_dir / "binning_process.pkl"))
@@ -73,12 +86,26 @@ def run(db: Path = S.DB_PATH, out_dir: Path = S.PROCESSED, rebuild_samples: bool
     )
     selection.table.to_csv(out_dir / "feature_selection.csv")
     card.to_json(out_dir / "scorecard.json", model="WoE logistic scorecard (champion), D-021")
+    with open(out_dir / "champion_v2.pkl", "wb") as fh:
+        pickle.dump(v2, fh)
+    v2.card.to_json(
+        out_dir / "champion_v2.json",
+        model="Logical dummy scorecard (champion v2), D-028",
+        features=v2.features,
+        flat_dropped=v2.flat,
+    )
+    v2.card.points_table().to_csv(out_dir / "champion_v2_points.csv", index=False)
     (out_dir / "train_metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
-    return {"shortlist": selection.shortlist, "scorecard": card, "metrics": metrics}
+    return {
+        "shortlist": selection.shortlist,
+        "scorecard": card,
+        "champion_v2": v2,
+        "metrics": metrics,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Fit the Track A champion scorecard.")
+    p = argparse.ArgumentParser(description="Fit the v1 WoE scorecard and champion v2.")
     p.add_argument("--db", type=Path, default=S.DB_PATH)
     p.add_argument("--out-dir", type=Path, default=S.PROCESSED)
     p.add_argument("--rebuild-samples", action="store_true")
@@ -87,8 +114,10 @@ def main(argv: list[str] | None = None) -> int:
     card = result["scorecard"]
     print("Shortlist:", result["shortlist"])
     print("Removed by the sign check:", card.removed)
-    print("Champion:", card.features)
-    print(pd.DataFrame(result["metrics"]).T.to_string())
+    print("v1 WoE scorecard:", card.features)
+    print("Champion v2 features:", result["champion_v2"].features)
+    for model, m in result["metrics"].items():
+        print(f"\n{model}\n" + pd.DataFrame(m).T.to_string())
     return 0
 
 

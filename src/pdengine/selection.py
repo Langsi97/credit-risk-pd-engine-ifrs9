@@ -19,8 +19,18 @@ from pdengine import settings as S
 from pdengine.registry import Registry
 
 
-def fit_bins(X: pd.DataFrame, y: pd.Series) -> BinningProcess:
-    """Fit the bins of every column of X (pass the train sample only)."""
+def fit_bins(
+    X: pd.DataFrame,
+    y: pd.Series,
+    min_bin_size: float = S.MIN_BIN_SIZE,
+    min_prebin_size: float = 0.05,
+    max_n_prebins: int = 20,
+) -> BinningProcess:
+    """Fit the bins of every column of X (pass the train sample only).
+
+    The defaults are the v1 settings (notebook 04). Champion v2 uses finer bins
+    (V2_MIN_BIN_SIZE, V2_MIN_PREBIN_SIZE, V2_MAX_N_PREBINS; D-028).
+    """
     features = list(X.columns)
     categorical = [c for c in S.CATEGORICAL if c in features]
     params = {
@@ -34,7 +44,9 @@ def fit_bins(X: pd.DataFrame, y: pd.Series) -> BinningProcess:
     bp = BinningProcess(
         features,
         categorical_variables=categorical,
-        min_bin_size=S.MIN_BIN_SIZE,
+        min_bin_size=min_bin_size,
+        min_prebin_size=min_prebin_size,
+        max_n_prebins=max_n_prebins,
         binning_fit_params=params,
     )
     return bp.fit(X, y)
@@ -145,4 +157,47 @@ def select_features(
 
     table["reason"] = pd.Series(reason)
     table["reason"] = table["reason"].fillna("kept")
+    return Selection(shortlist=kept, table=table)
+
+
+def screen_features(
+    bp: BinningProcess,
+    X: pd.DataFrame,
+    y: pd.Series,
+    sample: pd.Series,
+    country: pd.Series,
+    reg: Registry,
+) -> Selection:
+    """Champion v2 screens (D-028): keep every feature that is stable and logical.
+
+    A feature is dropped only for a population shift (PSI above MAX_PSI), a country effect
+    (the within-country check, run where the IV is at least MIN_IV, as in D-018), or because a
+    derived feature replaces it. The IV, correlation and VIF rules of v1 are not applied: they
+    protect a model with one coefficient per feature, and the v2 scorecard is fitted jointly,
+    with a ridge penalty and order constraints, so weak or overlapping features cannot flip it.
+    """
+    tr, oot = sample.eq("train"), sample.eq("oot")
+    bins_tr, bins_oot = transform(bp, X[tr], "bins"), transform(bp, X[oot], "bins")
+    woe_tr = transform(bp, X[tr], "woe")
+    table = bp.summary().set_index("name")[["iv"]].astype(float).sort_values("iv", ascending=False)
+    table["psi_oot"] = [psi(bins_tr[c], bins_oot[c]) for c in table.index]
+    table["rho_median"] = np.nan
+    for c in table.index:
+        if table.loc[c, "iv"] >= S.MIN_IV and c not in S.COUNTRY_FEATURES:
+            table.loc[c, "rho_median"] = within_country(woe_tr[c], country[tr], y[tr]).median()
+    reason: dict[str, str] = {}
+    for c in table.index:
+        if table.loc[c, "psi_oot"] > S.MAX_PSI:
+            reason[c] = f"population shift, PSI {table.loc[c, 'psi_oot']:.2f}"
+        elif table.loc[c, "rho_median"] > S.MAX_WITHIN_COUNTRY_RHO:
+            reason[c] = (
+                f"country effect (within-country correlation {table.loc[c, 'rho_median']:+.2f})"
+            )
+    for name, inputs in reg.derived.items():
+        if name in table.index:
+            for raw in inputs:
+                reason.setdefault(raw, f"input of {name}")
+    table["reason"] = pd.Series(reason)
+    table["reason"] = table["reason"].fillna("kept")
+    kept = [c for c in table.index if table.loc[c, "reason"] == "kept"]
     return Selection(shortlist=kept, table=table)

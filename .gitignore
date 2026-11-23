@@ -38,3 +38,6 @@ reports/*
 # Local environment files
 .env
 .env.*
+
+# CatBoost training logs (notebook 06 turns them off; this catches stray runs)
+catboost_info/

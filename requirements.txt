@@ -18,4 +18,9 @@ statsmodels==0.14.4
 # statsmodels 0.14.4 needs scipy < 1.16 (scipy._lib._util._lazywhere was removed in 1.16)
 scipy==1.15.3
 shap==0.46.0
+# Challengers (notebook 06, D-029): a glass-box Explainable Boosting Machine, CatBoost, and
+# Optuna to tune LightGBM by forward-chaining validation.
+interpret-core==0.6.9
+catboost==1.2.10
+optuna==5.1.0
 matplotlib==3.9.2

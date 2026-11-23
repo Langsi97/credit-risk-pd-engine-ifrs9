@@ -24,12 +24,15 @@ A running record of the modelling and engineering choices in this project, why t
 | D-018 | 2026-11-09 | Accepted |
 | D-019 | 2026-11-09 | Superseded by D-021 |
 | D-020 | 2026-11-23 | Accepted |
-| D-021 | 2026-11-23 | Accepted |
+| D-021 | 2026-11-23 | Superseded by D-028 |
 | D-022 | 2026-11-23 | Accepted |
 | D-023 | 2026-11-23 | Accepted |
 | D-024 | 2026-11-23 | Accepted |
 | D-025 | 2026-11-23 | Accepted |
 | D-026 | 2026-11-23 | Accepted |
+| D-027 | 2026-11-23 | Partly superseded by D-029 |
+| D-028 | 2026-11-24 | Accepted |
+| D-029 | 2026-11-24 | Accepted |
 
 ---
 
@@ -474,6 +477,61 @@ Over eight seeds, the six core features are chosen every time. Education also en
 **Rejected.** Promoting LightGBM to champion: its advantage comes from one identifiable source, country interactions, which a segmented scorecard can capture while keeping a points table and reason codes.
 
 **Watch.** Phase 4: build a country-segmented scorecard (Finland on its own; Spain stays pooled, D-024) and measure how much of the gap it closes; explain the challenger with SHAP; recalibrate both models; track the challenger's lead over the champion in monitoring.
+
+## D-028 Champion v2: a logical dummy scorecard with country-specific bins replaces the WoE scorecard
+
+**Context.** The 2026-11-23 audit re-ran notebooks 01 to 06 and tested alternatives at every stage, with choices made on train (forward-chaining validation) and test, and out-of-time only reported. Every challenger beat the v1 WoE scorecard (D-021) by about 0.05 Gini on test and out of time, and the corrected decomposition in notebook 06 (D-029) showed the gap is mostly feature shapes and features, not complex interactions. Three causes were isolated in notebook 07:
+
+* One coefficient per feature. With the same six features and bins, dummy coding gives +0.009 test, +0.010 OOT.
+* One set of bins for three countries. Loan size and history have different shapes in Estonia, Finland and Spain.
+* The D-018 selection rules (IV, correlation, VIF, sign loop) removed features that still carry information; they protect a one-coefficient model.
+
+**Decision.** Champion v2, built by `pdengine.champion.fit_champion` (notebook 07, `make train`):
+
+* Bins: finer (at least 2% of train loans, from 1% pre-bins, up to 100 pre-bins; optbinning's default 5% pre-bins capped the resolution).
+* Screens instead of selection rules: drop a feature only for population shift (PSI above 0.25), a country effect (D-018 within-country check) or because a derived feature replaces it. 16 features pass.
+* Interaction characteristics: `AppliedAmount`, `days_since_last_loan` and `days_since_first_loan` binned inside each country (at least 5% of that country's train loans).
+* One coefficient per bin, ridge penalty 1e-4, and order constraints: inside every ordered feature and every country of a crossed feature, coefficients follow the bins' train risk order (monotone increments solved with L-BFGS-B). Points are logical by construction (D-023 holds for every ordered feature, not only Education).
+* Parsimony: characteristics whose points vary by less than 2 are removed and the card refitted. Six are removed; v2 has 10 characteristics.
+* Same points scaling as v1 (600 at 30:1, PDO 20). Reason codes: points below the best cell of each characteristic.
+
+**Evidence.**
+
+| | Validation | Test Gini | OOT Gini | OOT Finland |
+|---|---|---|---|---|
+| v1 WoE scorecard | 0.443 | 0.459 | 0.368 | 0.154 |
+| Champion v2 | 0.452 | 0.480 | 0.401 | 0.287 |
+| EBM, 10 interactions | 0.456 | 0.513 | 0.426 | 0.265 |
+| CatBoost, 24 features | 0.462 | 0.516 | 0.449 | 0.325 |
+| Bondora PD | | 0.414 | 0.405 | 0.284 |
+
+* v2 minus v1 (paired bootstrap 95%): test +0.017 to +0.025, OOT +0.028 to +0.038.
+* v2 minus Bondora PD, OOT: −0.021 to +0.014 (level).
+* Without the order constraints 9 of 18 ordered groups break their order; the constraints cost 0.001 validation, 0.006 test.
+* `make train` and notebook 07 give identical PDs.
+
+**Rejected.** Three separate country scorecards (+0.012 test, less than the crossed bins, and a third of the data each). A separate Finland scorecard (OOT FI 0.161). Free dummy coefficients (illogical points). Promoting a boosting model or the EBM to champion (no points table, no logical guarantee; the EBM stays main challenger). Finer bins alone (+0.002). Recency weighting and a different training window start (not supported by year-ahead validation).
+
+**Watch.** Score PSI train vs OOT is 0.19 (v1 0.09), driven by Finland's post-2019 loan sizes: monitor per country. OOT mean PD 26.0% vs 14.4% observed: Phase 4 recalibration. The challengers still lead by about 0.03 test Gini; a growing lead is the signal to revisit the champion's form. Finland's 2019–2020 break coincides with the national consumer-credit interest cap (20% from September 2019, a temporary 10% from July 2020).
+
+## D-029 Challengers: data-checked monotone constraints, corrected decomposition, CatBoost and EBM added
+
+**Context.** The audit found two errors in notebook 06 (D-027) and one unsupported follow-up.
+
+* Step 6 reused the free model's tree count for the additive and country-only models, which under-trained them. Re-tuned, the additive models recover most of the gain, the opposite of the D-027 conclusion.
+* Five monotone constraints contradicted the train data: `AppliedAmount`, `Amount`, `days_since_last_loan`, `ExistingLiabilities`, `LiabilitiesTotal` (default rates by quintile are not monotone).
+* "A Finland scorecard is planned" (D-027): a separate Finland scorecard gives OOT FI 0.161 against 0.154.
+
+**Decision.**
+
+* `settings.MONOTONE` keeps five constraints: `days_since_first_loan`, `NoOfPreviousLoansBeforeLoan`, `AmountOfPreviousLoansBeforeLoan` (−1), `NewCreditCustomer`, `income_vs_country_median`.
+* LightGBM is tuned with Optuna (30 trials) on forward-chaining validation; CatBoost (depth by validation) and an Explainable Boosting Machine (the 16 screened features, additive and 10 interactions) are added.
+* Every restricted model in the decomposition is tuned separately.
+* The EBM is the main challenger (glass box); CatBoost and LightGBM are black-box benchmarks. The D-027 Finland-scorecard follow-up is withdrawn (see D-028).
+
+**Evidence.** Test / OOT Gini: LightGBM 24 0.515 / 0.439, CatBoost 0.516 / 0.449, EBM 10 interactions 0.513 / 0.426; the three are level on test (paired intervals touch zero). All three beat Bondora PD out of time (LightGBM +0.017 to +0.051, CatBoost +0.028 to +0.060, EBM +0.005 to +0.039). Decomposition on the six v1 features (test): v1 0.459; additive LightGBM 0.481, additive EBM 0.488; free LightGBM 0.490, EBM with 10 pairs 0.500. Extra features (EBM additive, 16 vs 6): +0.013 test.
+
+**Rejected.** An ensemble of the best models (no gain on test over the best single model). Monotone EBM shapes (−0.007 to −0.014 test). Keeping the five contradicted constraints.
 
 ---
 
