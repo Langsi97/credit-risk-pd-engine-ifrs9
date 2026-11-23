@@ -25,7 +25,7 @@ from pdengine import samples as samples_mod
 from pdengine import settings as S
 from pdengine.dataset import load_model_data
 from pdengine.registry import load_registry
-from pdengine.scorecard import fit_scorecard, gini, ks
+from pdengine.scorecard import brier, check_logical_points, fit_scorecard, gini, ks
 from pdengine.selection import fit_bins, select_features, transform
 
 
@@ -49,6 +49,7 @@ def run(db: Path = S.DB_PATH, out_dir: Path = S.PROCESSED, rebuild_samples: bool
     woe = transform(bp, data.X, "woe")
     card = fit_scorecard(woe[tr], data.y[tr], selection.shortlist)
     card.build_points(bp)
+    check_logical_points(bp, card)  # D-023
 
     pd_hat = card.predict_pd(woe)
     metrics = {}
@@ -58,6 +59,7 @@ def run(db: Path = S.DB_PATH, out_dir: Path = S.PROCESSED, rebuild_samples: bool
             "loans": int(m.sum()),
             "gini": round(gini(data.y[m], pd_hat[m]), 4),
             "ks": round(ks(data.y[m], pd_hat[m]), 4),
+            "brier": round(brier(data.y[m], pd_hat[m]), 4),
             "gini_bondora_pd": round(gini(data.y[m], data.bondora_pd[m]), 4),
             "mean_pd": round(float(pd_hat[m].mean()), 4),
             "default_rate": round(float(data.y[m].mean()), 4),

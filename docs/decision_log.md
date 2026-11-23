@@ -26,6 +26,9 @@ A running record of the modelling and engineering choices in this project, why t
 | D-020 | 2026-11-23 | Accepted |
 | D-021 | 2026-11-23 | Accepted |
 | D-022 | 2026-11-23 | Accepted |
+| D-023 | 2026-11-23 | Accepted |
+| D-024 | 2026-11-23 | Accepted |
+| D-025 | 2026-11-23 | Accepted |
 
 ---
 
@@ -352,6 +355,82 @@ Across eight seeds (42, 1 to 7), the whole pipeline chose the same seven feature
 **Why.** A model result that cannot be reproduced cannot be validated. One number from one random draw can mislead; the range shows how much is the draw.
 
 **Rejected.** Keeping the old saved samples as the "official" ones (they cannot be rebuilt). Hash-based splitting on the loan key (also reproducible, but changes the sampling method rather than fixing the order).
+
+
+## D-023 Logical points for Education, a baseline comparison, and a test of indeterminate loans
+
+**Context.** A second review against the textbooks (Siddiqi, *Intelligent Credit Scoring*; Baesens et al., *Credit Risk Analytics*; Provost and Fawcett, *Data Science for Business*) found three things the scorecard did not yet do.
+
+**Decision.**
+1. **Logical points (Siddiqi, ch. 10, "Points allocation").** The automatic bins ranked secondary education (code 4) above higher education (5), giving a degree fewer points (76 against 74). Education is now grouped by hand, in a logical order: secondary or higher (4, 5), basic or vocational (2, 3), primary or unknown (1, -1, 0), in `pdengine.settings.MANUAL_GROUPS`. `pdengine.scorecard.check_logical_points` makes the pipeline fail if an ordered feature (`settings.LOGICAL_ORDER`) ever gives fewer points to a higher category. With the logical grouping, Education's IV is 0.019, below the 0.02 minimum, so it leaves the shortlist. The champion has six features: `country_bureau_grade`, `days_since_first_loan`, `days_since_last_loan`, `HomeOwnershipType`, `AppliedAmount`, `income_vs_country_median`.
+2. **Baseline (Provost and Fawcett, ch. 7).** Notebook 05 now compares the scorecard with simple baselines on the same loans:
+
+   | Model | Test Gini | Out-of-time Gini |
+   |---|---|---|
+   | Country alone | 0.377 | 0.220 |
+   | Country and bureau grade | 0.409 | 0.293 |
+   | Champion scorecard | 0.459 | 0.368 |
+   | Bondora PD | 0.414 | 0.405 |
+
+3. **Indeterminates (Siddiqi, ch. 6).** Loans fully repaid within their first 12 months (8,099 train loans, 11%, default rate about 0.1%) are counted as goods. Refitting without them changes the Gini by less than 0.002 on test and out of time, so the target stays as it is. They stay in for calibration, because they are real non-defaults.
+
+The pipeline metrics now include the Brier score: 0.185 on test (Bondora 0.193), 0.137 out of time (Bondora 0.116, because its PD level is closer).
+
+**Results (seed 42).**
+* Test Gini 0.459 (0.448 to 0.471), paired difference with Bondora +0.045.
+* Out-of-time Gini 0.368 (0.353 to 0.382), paired difference -0.037.
+
+Over eight seeds, the six core features are chosen every time. Education also enters with two seeds, because its IV is 0.018 to 0.020, right on the cut-off. Out-of-time Gini ranges from 0.358 to 0.368.
+
+**Why.** Illogical points would fail a model review. Without a baseline, a Gini says nothing about what the model adds beyond the country. The indeterminate test shows the target choice does not drive the result.
+
+**Rejected.**
+* Keeping Education with its reversal (unexplainable points).
+* Forcing Education in despite its IV below 0.02 (the rule applies to every feature).
+* Excluding the indeterminates from the target (no effect on ranking, and it would bias calibration).
+
+## D-024 Textbook practices not applied yet, or not possible with this data
+
+**Context.** The same review listed every practice the three books recommend for a scorecard and PD model. This entry records the ones the project has not applied, and why, so a reviewer can see they were considered rather than missed.
+
+**Deferred to a later phase (possible with this data).**
+
+| Practice | Source | Phase | Why later |
+|---|---|---|---|
+| Calibration tests: Hosmer-Lemeshow, binomial test per grade, traffic-light summary | Baesens ch. 13 | 4 | They test PD levels by grade; the grades only exist after recalibration. The out-of-time PDs are currently 1.9 times too high, so testing them now would only confirm that. |
+| Point-in-time vs through-the-cycle PD philosophy | Baesens | 4 | Decided at recalibration. IFRS 9 needs point-in-time, forward-looking PDs. |
+| Reason codes from the neutral score | Siddiqi ch. 10 | 4 | Delivered with the risk grades and the API, alongside SHAP for the challenger. |
+| Cut-off table and profit curve (approval rate, bad rate, expected profit) | Siddiqi ch. 11; Provost and Fawcett ch. 7-8 | 4 | Needs calibrated PDs and a stated LGD. |
+| Several candidate scorecards compared, including the D-012 sensitivity run with `Interest` | Siddiqi ch. 10 | 3 (challenger notebook) | Compared together with the LightGBM challenger on the same samples. |
+| Learning curve and fitting graph | Provost and Fawcett ch. 5 | 3 (challenger notebook) | Most informative for the challenger, whose complexity can vary. |
+| Justify the 12-month default definition with vintage or roll-rate evidence | Siddiqi ch. 6 | 5 | Uses the vintage curves built for the lifetime PD (D-011). |
+| Staging layer that turns 1970 placeholder dates into missing values | Notebook 02, step 3 | 5 | Those dates are first used in the vintage and LGD work; no Track A feature uses them. |
+| Scorecard characteristic analysis (score shift caused by each feature's population shift) | Siddiqi ch. 14 | 6 | A monitoring report; the PSI of every feature is already reported (notebook 04). |
+
+**Not possible with this data.**
+
+| Practice | Source | Why not |
+|---|---|---|
+| Reject inference | Siddiqi ch. 10 | The data contain only funded loans, no rejected applications. The scorecard ranks the population Bondora accepted. |
+| Credit bureau variables (inquiries, trades, delinquency at other lenders) | Siddiqi App. A | Not in the public data; only a single bureau grade per country is available, and the Spanish ones are unusable out of time (D-014). |
+| Internal behaviour beyond the loan history (balances, payments, other products) | Siddiqi App. A; Baesens ch. 5 | Bondora's public data describe loans, not customers' accounts. Tenure and recency are what the data allow (D-020). |
+| Override and policy-rule analysis | Siddiqi ch. 10-11 | No record of manual decisions or policy rules. |
+| Separate scorecards by country | Siddiqi ch. 6 | Spain has only one quarter of out-of-time lending (2,996 loans). A new-versus-repeat customer segmentation was tested instead and added 0.0025 Gini (D-020). |
+| Pre-implementation validation on recent applicants with the full feature set | Siddiqi ch. 11 | Kaggle features stop in July 2021. Later loans exist only in the official feed, without application fields; the roadmap's core score is the partial answer. |
+| Previous-default features | Siddiqi App. A | Possible to build, but biased: Bondora rarely re-lends after a default, and the few exceptions default less than average (D-020). |
+
+**Why.** Recording what was not done, and why, is part of model documentation: it separates a considered limitation from an oversight.
+
+
+## D-025 Pin cvxpy 1.6.7 and osqp 0.6.7 so the tests run on Windows
+
+**Context.** On Windows, `pytest` crashed with an access violation while importing `optbinning`. The chain is `optbinning` -> `ropwr` -> `cvxpy` -> `osqp`. `osqp` 1.x, which `cvxpy` 1.7 and later require, probes an optional Intel MKL backend (`osqp.ext_mkl`) when it is imported, and that probe crashed the process. A plain `python -c "import optbinning"` worked, so the crash depends on what is already loaded in the process. CI on Linux was not affected.
+
+**Decision.** Pin `cvxpy==1.6.7` and `osqp==0.6.7.post3` in `requirements.txt`. `osqp` 0.6.7 is a single compiled module with no backend probe, and `cvxpy` 1.6.7 is the last series that accepts it. The project uses neither library directly; `optbinning` bins with OR-Tools.
+
+**Evidence.** A clean environment with every pinned requirement passes `pip check`, imports all libraries with the crash handler on, and passes the full test suite (89 tests).
+
+**Rejected.** Changing the import order (fragile, and the cause is inside `osqp`). Removing `osqp` (`cvxpy` declares it as a dependency).
 
 ---
 

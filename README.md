@@ -50,17 +50,32 @@ The project is considered successful when the following outcomes are met:
 
 ## Results so far
 
-Champion scorecard: a logistic regression on the weight of evidence of seven features, scaled to points (600 points at good:bad odds of 30:1, 20 points to double the odds). Features: country with its credit-bureau grade, customer tenure, time since the last loan, home ownership, amount applied for, education, and income relative to the country median ([D-021](docs/decision_log.md)).
+Champion scorecard: a logistic regression on the weight of evidence of six features, scaled to points (600 points at good:bad odds of 30:1, 20 points to double the odds). Features: country with its credit-bureau grade, customer tenure, time since the last loan, home ownership, amount applied for, and income relative to the country median ([D-021 to D-023](docs/decision_log.md)).
 
-| Sample | Loans | Gini (95% bootstrap) | Bondora's own PD |
-|---|---|---|---|
-| Test, 2016 to 2019 | 32,273 | **0.461** (0.449 to 0.472) | 0.414 |
-| Out-of-time, 2020 to Jul 2021 | 48,150 | **0.367** (0.353 to 0.381) | 0.405 |
+| Gini | Test, 2016 to 2019 (32,273 loans) | Out-of-time, 2020 to Jul 2021 (48,150 loans) |
+|---|---|---|
+| Baseline: country alone | 0.377 | 0.220 |
+| Baseline: country and its bureau grade | 0.409 | 0.293 |
+| **Champion scorecard** (95% bootstrap) | **0.459** (0.448 to 0.471) | **0.368** (0.353 to 0.382) |
+| Bondora's own PD | 0.414 | 0.405 |
 
-* On the test sample the scorecard ranks borrowers better than Bondora's own model (paired difference +0.046, interval 0.035 to 0.056).
-* Out of time it meets the 0.35 target but Bondora's model holds up better (difference -0.038). The main reason: Finland's default rate fell from 42% to 14% after 2019, so the gap between countries, the scorecard's strongest signal, shrank ([notebook 05](notebooks/05_scorecard.ipynb), step 6).
-* Repeating the whole pipeline with eight random seeds selects the same seven features every time; the out-of-time Gini stays between 0.357 and 0.367 ([D-022](docs/decision_log.md)).
+* Beyond the country and its bureau grade, the other features add 0.05 of Gini on test and 0.08 out of time.
+* On the test sample the scorecard ranks borrowers better than Bondora's own model (paired difference +0.045, interval 0.034 to 0.055).
+* Out of time it meets the 0.35 target but Bondora's model holds up better (difference -0.037). The main reason: Finland's default rate fell from 42% to 14% after 2019, so the gap between countries, the scorecard's strongest signal, shrank ([notebook 05](notebooks/05_scorecard.ipynb), step 6).
+* Repeating the whole pipeline with eight random seeds selects the same six core features every time; the out-of-time Gini stays between 0.358 and 0.368 ([D-022, D-023](docs/decision_log.md)).
 * Out of time the predicted default rates are about 1.9 times too high (27% predicted, 14% observed), so the PDs must be recalibrated before any use. That is the next phase.
+
+## What this project does not do, and why
+
+The work follows Siddiqi (*Intelligent Credit Scoring*), Baesens et al. (*Credit Risk Analytics*) and Provost and Fawcett (*Data Science for Business*). Some of their recommendations are scheduled for later phases: calibration tests by grade, reason codes, cut-off and profit analysis, the PD philosophy choice, and vintage evidence for the 12-month definition. Others are not possible with public Bondora data:
+
+* **No reject inference.** The data hold only funded loans, so the scorecard ranks the population Bondora accepted, not every applicant.
+* **No credit bureau detail.** Inquiries, other lenders' trades and their payment history are not published. There is only one bureau grade per country, and the Spanish ones are unusable after 2019.
+* **Little customer behaviour.** The data describe loans, not accounts. Customer tenure and time since the last loan are what the loan history allows.
+* **No separate country scorecards.** Spain has only one quarter of out-of-time lending.
+* **No validation on recent applicants.** Application fields stop in July 2021.
+
+Each item, its source and its reason are listed in [decision D-024](docs/decision_log.md).
 
 ## Getting started
 

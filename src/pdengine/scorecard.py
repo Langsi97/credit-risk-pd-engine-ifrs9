@@ -102,6 +102,27 @@ class Scorecard:
         return cls(**{k: d[k] for k in keys if k in d})
 
 
+class IllogicalPointsError(ValueError):
+    """An ordered feature gives fewer points to a higher (safer) category."""
+
+
+def check_logical_points(bp: BinningProcess, card: Scorecard) -> None:
+    """Raise unless every LOGICAL_ORDER feature's points never fall as the category rises."""
+    for feature, order in S.LOGICAL_ORDER.items():
+        if feature not in card.features:
+            continue
+        woe = bp.get_binned_variable(feature).transform(np.array(order), metric="woe")
+        points = -card.coefficients[feature] * np.asarray(woe)  # points rise with this term
+        if (np.diff(points) < -1e-9).any():
+            pts = dict(zip(order, np.round(points, 3), strict=True))
+            raise IllogicalPointsError(f"{feature}: points fall along {order}: {pts}")
+
+
+def brier(y, pd_hat) -> float:
+    """Mean squared error of the predicted PD: lower is better, rewards correct levels."""
+    return float(np.mean((np.asarray(pd_hat) - np.asarray(y)) ** 2))
+
+
 def fit_scorecard(woe: pd.DataFrame, y: pd.Series, features: list[str]) -> Scorecard:
     """Fit on the train sample (pass train rows only)."""
     model, kept, removed = fit_with_sign_checks(woe, y, features)
