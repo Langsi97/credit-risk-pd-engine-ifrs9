@@ -22,7 +22,9 @@ A running record of the modelling and engineering choices in this project, why t
 | D-016 | 2026-11-09 | Accepted |
 | D-017 | 2026-11-09 | Accepted |
 | D-018 | 2026-11-09 | Accepted |
-| D-019 | 2026-11-09 | Accepted |
+| D-019 | 2026-11-09 | Superseded by D-021 |
+| D-020 | 2026-11-23 | Accepted |
+| D-021 | 2026-11-23 | Accepted |
 
 ---
 
@@ -271,6 +273,51 @@ Paired difference with Bondora's PD: +0.022 on test (0.012 to 0.033), -0.056 out
 **Rejected.** Keeping `ExistingLiabilities` with a wrong-sign weight. Changing features after seeing the out-of-time results (would end the independence of the out-of-time test).
 
 **Open.** The out-of-time PDs are about 1.9 times the observed rate: recalibrate per country before any decision or ECL use (roadmap D10, Phase 4). `Education` has the least stable weight (-0.34 on train, -0.23 on test).
+
+
+## D-020 History features: customer tenure and recency, rebuilt as of the application date
+
+**Context.** A review of phases 1 to 3 against Siddiqi (Appendix A, "time as customer"; chapter 6 on tenure-based segments) and Baesens et al. (chapter 5, behavioural variables) asked what a lender knows about its own repeat customers. The Kaggle file links a borrower's loans through `UserName` (registry class `personal`). Counting a borrower's earlier loans this way reproduces Bondora's `NoOfPreviousLoansBeforeLoan` for 99.9% of loans, so the link is reliable. This review came after notebook 05 had shown the first out-of-time result (D-019). The new features were chosen on the train and test samples only.
+
+**Decision.**
+* Add `src/pdengine/history.py`, which computes for every loan, from the same borrower's loans issued **strictly before** its date:
+  * `days_since_first_loan` (tenure) and
+  * `days_since_last_loan` (recency).
+
+  Both are empty for a first loan. The history is computed over all 179,235 Kaggle loans.
+* Add a `history:` section to `config/feature_registry.yaml`. `pdengine.registry` accepts a history feature only if its key is a `key` or `personal` column and its date is an `application` column, and `check_model_columns` allows it. The key itself never enters a model and is not returned by the function.
+* Unit tests check the values, that same-day loans do not count as earlier, that adding a later loan never changes an earlier loan's history, and that the key is not in the output.
+
+**Evidence.** Tenure has IV 0.27 (test 0.25) and recency 0.19. Both are monotone inside every country (median within-country correlation -0.83 and -0.88) and stable out of time (PSI 0.01 and 0.03).
+
+**Rejected (tested on the train and test samples).**
+* Prior defaults with Bondora: only 560 of 75,302 train loans have one, and they default *less* than average, because Bondora rarely re-lends after a default and hand-picks the exceptions (Siddiqi's cherry-picking example, chapter 10).
+* Affordability ratios (liabilities, amount or monthly principal over income): IV 0.005 to 0.04.
+* Active previous loans: wrong sign once tenure is in.
+* Loan step-up (amount vs the average previous loan): repeats the previous-loan count (correlation 0.83).
+* A separate scorecard for new and repeat customers: +0.0025 Gini on test, not worth a second model (Siddiqi chapter 6).
+
+## D-021 Champion scorecard, version 2 (supersedes D-019)
+
+**Context.** Notebooks 04 and 05 were re-run with the D-020 history features, under the unchanged D-018 rules. Tenure replaces `NoOfPreviousLoansBeforeLoan` (correlation 0.73, higher IV), and the shortlist has nine features.
+
+**Decision.**
+* The sign-and-significance check is now a loop. Remove the wrong-sign feature with the highest p-value first, then any non-significant one, refitting each time. It removed `ExistingLiabilities` (+0.07, p 0.06), then `AmountOfPreviousLoansBeforeLoan` (+0.24).
+* The champion has seven features: `country_bureau_grade`, `days_since_first_loan`, `days_since_last_loan`, `HomeOwnershipType`, `AppliedAmount`, `Education`, `income_vs_country_median`. All coefficients are negative with p ≤ 0.0001, and a refit on the test sample gives the same signs.
+* Scaling is unchanged: 600 points at 30:1, PDO 20. Train scores run from 483 to 588. 38 bins.
+
+**Results.**
+
+| Sample | Gini v2 (95% bootstrap) | Gini v1 (D-019) | Bondora PD | Paired difference v2 vs Bondora |
+|---|---|---|---|---|
+| Test | 0.454 (0.442 to 0.466) | 0.440 | 0.418 | +0.036 (0.025 to 0.047) |
+| Out-of-time | 0.356 (0.342 to 0.371) | 0.349 | 0.405 | -0.049 (-0.068 to -0.032) |
+
+Calibration: exact in-time; out of time the PD averages 26.8% against 14.4% observed (ratio 1.86).
+
+**Why.** The history features carry what a lender knows about a repeat customer and hold in every country. Version 1 stays in the log so the change after the first out-of-time read is visible.
+
+**Open.** Recalibration per country before any use (roadmap D10, Phase 4). The out-of-time gap to Bondora remains; Bondora has repayment behaviour and bureau data that this project cannot use.
 
 ---
 

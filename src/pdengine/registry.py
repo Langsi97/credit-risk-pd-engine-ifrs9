@@ -20,7 +20,7 @@ Usage
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -52,6 +52,9 @@ class Column:
 class Registry:
     columns: dict[str, Column]
     derived: dict[str, tuple[str, ...]]  # engineered feature -> raw columns it is computed from
+    # History feature -> (borrower key column, date column). Built from the borrower's earlier
+    # loans only (pdengine.history); the key itself never enters a model.
+    history: dict[str, tuple[str, str]] = field(default_factory=dict)
 
 
 def load_registry(path: Path | str = DEFAULT_PATH) -> Registry:
@@ -85,7 +88,24 @@ def load_registry(path: Path | str = DEFAULT_PATH) -> Registry:
             raise RegistryError(f"derived feature {name!r} uses non-candidate inputs: {bad}")
         derived[name] = inputs
 
-    return Registry(columns=columns, derived=derived)
+    history = {}
+    for name, spec in (raw.get("history") or {}).items():
+        key, date = spec["key"], spec["date"]
+        if name in columns or name in derived:
+            raise RegistryError(f"history feature {name!r} has the same name as another feature")
+        # The key only links a borrower's loans (it may be personal, never a model input);
+        # the date must be known on the application day, or the history would see the future.
+        if key not in columns or columns[key].cls not in ("key", "personal"):
+            raise RegistryError(
+                f"history feature {name!r}: key {key!r} must be a key or personal column"
+            )
+        if date not in columns or columns[date].cls != "application":
+            raise RegistryError(
+                f"history feature {name!r}: date {date!r} must be an application column"
+            )
+        history[name] = (key, date)
+
+    return Registry(columns=columns, derived=derived, history=history)
 
 
 def candidate_features(reg: Registry) -> list[str]:
@@ -101,11 +121,11 @@ def columns_of(reg: Registry, cls: str) -> list[str]:
 
 
 def check_model_columns(columns, reg: Registry) -> None:
-    """Raise LeakageError unless every column is a candidate or a registered derived feature.
+    """Raise LeakageError unless every column is a candidate, derived or history feature.
 
     Call this right before fitting or scoring any model.
     """
-    allowed = set(candidate_features(reg)) | set(reg.derived)
+    allowed = set(candidate_features(reg)) | set(reg.derived) | set(reg.history)
     bad = [c for c in columns if c not in allowed]
     if bad:
         reasons = [

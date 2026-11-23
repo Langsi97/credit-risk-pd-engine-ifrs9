@@ -156,3 +156,16 @@ derived:
   income_vs_country_median:
     inputs: [IncomeTotal, Country]
     note: "D-017: IncomeTotal relative to the train median of the country (pdengine.features)"
+
+# History features (D-020): built by pdengine.history from the same borrower's EARLIER loans
+# (issued strictly before this loan's date). `key` links the loans and never enters a model;
+# `date` must be an application column, so no history can come from after the application.
+history:
+  days_since_first_loan:
+    key: UserName
+    date: LoanDate
+    note: "D-020: customer tenure, days since the borrower's first Bondora loan; empty for new customers"
+  days_since_last_loan:
+    key: UserName
+    date: LoanDate
+    note: "D-020: recency, days since the borrower's most recent earlier Bondora loan; empty for new customers"
