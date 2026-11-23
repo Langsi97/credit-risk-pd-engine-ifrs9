@@ -45,7 +45,7 @@ def country_bureau_grade(df: pd.DataFrame) -> pd.Series:
 
 # Median IncomeTotal per country in the train sample (notebook 04 checks these still match).
 # Frozen here so a new application is scored with the same reference as the training data.
-TRAIN_MEDIAN_INCOME = {"EE": 1000.0, "ES": 1350.0, "FI": 2036.0}
+TRAIN_MEDIAN_INCOME = {"EE": 1000.0, "ES": 1350.0, "FI": 2068.0}
 
 
 def income_vs_country_median(df: pd.DataFrame) -> pd.Series:

@@ -9,5 +9,7 @@ scikit-learn==1.5.2
 lightgbm==4.5.0
 optbinning==0.20.0
 statsmodels==0.14.4
+# statsmodels 0.14.4 needs scipy < 1.16 (scipy._lib._util._lazywhere was removed in 1.16)
+scipy==1.15.3
 shap==0.46.0
 matplotlib==3.9.2
