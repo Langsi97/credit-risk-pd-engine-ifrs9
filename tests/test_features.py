@@ -17,7 +17,7 @@ def _loans():
             "Country": ["EE", "EE", "FI", "FI", "ES", "SK"],
             "CreditScoreEeMini": [1000.0, np.nan, np.nan, np.nan, np.nan, np.nan],
             "CreditScoreFiAsiakasTietoRiskGrade": [None, None, "3", "RL2", None, None],
-            "IncomeTotal": [1000.0, 500.0, 2036.0, 4072.0, 675.0, 900.0],
+            "IncomeTotal": [1000.0, 500.0, 2068.0, 4136.0, 675.0, 900.0],
         },
         index=["a", "b", "c", "d", "e", "f"],
     )

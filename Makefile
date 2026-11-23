@@ -4,13 +4,14 @@
 
 PYTHON ?= python
 
-.PHONY: help install data warehouse train ecl report serve lint format test all
+.PHONY: help install data warehouse samples train ecl report serve lint format test all
 
 help:
 	@echo "install    install the package and dev tools into the active venv"
 	@echo "data       download Bondora data (official feed + Kaggle snapshot) to data/raw/"
 	@echo "warehouse  convert raw files to Parquet and build the DuckDB warehouse"
-	@echo "train      fit the WoE logistic scorecard and the LightGBM challenger"
+	@echo "samples    exclusions waterfall and train/test/out-of-time samples"
+	@echo "train      samples, bins, feature selection and the WoE logistic scorecard"
 	@echo "ecl        compute 12-month PD x LGD x EAD under baseline, adverse, severe"
 	@echo "report     build the model documentation and scenario tables in reports/"
 	@echo "serve      start the FastAPI /score endpoint locally"
@@ -30,6 +31,9 @@ data:
 # The targets below call modules that are built in later stages of the project.
 warehouse:
 	$(PYTHON) -m pdengine.warehouse
+
+samples:
+	$(PYTHON) -m pdengine.samples
 
 train:
 	$(PYTHON) -m pdengine.train

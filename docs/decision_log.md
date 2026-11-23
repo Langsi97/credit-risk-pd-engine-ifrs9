@@ -25,6 +25,7 @@ A running record of the modelling and engineering choices in this project, why t
 | D-019 | 2026-11-09 | Superseded by D-021 |
 | D-020 | 2026-11-23 | Accepted |
 | D-021 | 2026-11-23 | Accepted |
+| D-022 | 2026-11-23 | Accepted |
 
 ---
 
@@ -318,6 +319,39 @@ Calibration: exact in-time; out of time the PD averages 26.8% against 14.4% obse
 **Why.** The history features carry what a lender knows about a repeat customer and hold in every country. Version 1 stays in the log so the change after the first out-of-time read is visible.
 
 **Open.** Recalibration per country before any use (roadmap D10, Phase 4). The out-of-time gap to Bondora remains; Bondora has repayment behaviour and bureau data that this project cannot use.
+
+
+## D-022 Reproducible sample split, Track A pipeline in src/pdengine, and results over seeds
+
+**Context.** Moving notebooks 03 to 05 into the package (`python -m pdengine.train`) showed that the pipeline gave different samples from notebook 03, although the code was the same. The cause: DuckDB returns rows in a different order on every run (it reads in parallel), and a seeded random split is only reproducible if its input order is fixed. Of 155,725 loans, about 150,000 changed position between two identical queries. The saved samples were consistent across notebooks 04 and 05, but re-running notebook 03 would have produced a different split.
+
+**Decision.**
+* Sort the loans by `loan_key` before the train/test split (`pdengine.samples.assign_samples` and notebook 03). A test checks that shuffling the input never changes the split.
+* The Track A pipeline lives in `src/pdengine`:
+  * `settings` (every rule and threshold, with its decision),
+  * `samples` (waterfall and split),
+  * `dataset` (model matrix and column types),
+  * `selection` (bins and D-018 rules),
+  * `scorecard` (fit with the sign loop, points, JSON),
+  * `train` (end to end).
+
+  `make samples` and `make train` run it. The notebooks keep the explanations, and each checks that the pipeline reproduces its result (notebook 03: same samples; notebook 05: same scorecard).
+* The samples were rebuilt with the fixed order and notebooks 03 to 05 re-run. The frozen Finnish median income for `income_vs_country_median` (D-017) changes from 2,036 to 2,068 euros, the median of the new train sample; notebook 04's guard caught the difference.
+* Report the out-of-time Gini as a range over seeds next to the seed-42 value.
+* Pin `scipy==1.15.3`: statsmodels 0.14.4 fails to import with scipy 1.16 or later.
+
+**Results (seed 42, reproducible).** The same seven champion features as D-021.
+
+| Sample | Gini (95% bootstrap) | Bondora PD | Paired difference |
+|---|---|---|---|
+| Test | 0.461 (0.449 to 0.472) | 0.414 | +0.046 (0.035 to 0.056) |
+| Out-of-time | 0.367 (0.353 to 0.381) | 0.405 | -0.038 (-0.056 to -0.020) |
+
+Across eight seeds (42, 1 to 7), the whole pipeline chose the same seven features every time. Test Gini ranged from 0.447 to 0.463, out-of-time Gini from 0.357 to 0.367 (mean 0.363), and the scorecard beat Bondora's PD on test with every seed. The earlier 0.356 (D-021) was one draw within that range. Out-of-time calibration ratio: 1.88.
+
+**Why.** A model result that cannot be reproduced cannot be validated. One number from one random draw can mislead; the range shows how much is the draw.
+
+**Rejected.** Keeping the old saved samples as the "official" ones (they cannot be rebuilt). Hash-based splitting on the loan key (also reproducible, but changes the sampling method rather than fixing the order).
 
 ---
 
