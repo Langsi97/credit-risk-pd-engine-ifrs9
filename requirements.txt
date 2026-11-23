@@ -8,6 +8,12 @@ pyyaml==6.0.2
 scikit-learn==1.5.2
 lightgbm==4.5.0
 optbinning==0.20.0
+# optbinning imports cvxpy, which imports osqp. osqp 1.x (required by cvxpy >= 1.7) probes an
+# Intel MKL backend at import and crashes Python on Windows under pytest (access violation).
+# osqp 0.6.7 has no backend probe; cvxpy 1.6.7 is the last series that accepts it. The project
+# uses neither library directly (D-025).
+cvxpy==1.6.7
+osqp==0.6.7.post3
 statsmodels==0.14.4
 # statsmodels 0.14.4 needs scipy < 1.16 (scipy._lib._util._lazywhere was removed in 1.16)
 scipy==1.15.3

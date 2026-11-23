@@ -35,6 +35,13 @@ CATEGORICAL = [
 ]
 # No economic reason for a one-direction trend: allow one peak or valley.
 NON_MONOTONIC = ["ApplicationSignedHour", "MonthlyPaymentDay"]
+# Manual groupings (Siddiqi, ch. 10: overrides are allowed when documented). D-023:
+# the automatic bins put secondary education (code 4) above higher education (5), which gave
+# a degree fewer points. Education codes: 1 primary, 2 basic, 3 vocational, 4 secondary,
+# 5 higher, -1/0 unknown.
+MANUAL_GROUPS = {"Education": [["4", "5"], ["2", "3"], ["1", "-1", "0"]]}
+# Ordered features whose points must never fall as the category rises (D-023).
+LOGICAL_ORDER = {"Education": ["1", "2", "3", "4", "5"]}
 
 # ---------------------------------------------------------------- selection rules (D-018)
 MIN_IV = 0.02

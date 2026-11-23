@@ -7,8 +7,15 @@ import pytest
 from pdengine import settings as S
 from pdengine.dataset import prepare_types
 from pdengine.samples import assign_samples, exclusions_waterfall
-from pdengine.scorecard import Scorecard, fit_with_sign_checks, gini
-from pdengine.selection import information_value, psi, within_country
+from pdengine.scorecard import (
+    IllogicalPointsError,
+    Scorecard,
+    brier,
+    check_logical_points,
+    fit_with_sign_checks,
+    gini,
+)
+from pdengine.selection import fit_bins, information_value, psi, within_country
 
 RNG = np.random.default_rng(0)
 
@@ -145,6 +152,38 @@ def test_scorecard_json_round_trip(tmp_path):
     card.to_json(tmp_path / "s.json", model="test")
     again = Scorecard.from_json(tmp_path / "s.json")
     assert again == card
+
+
+def test_manual_education_groups_are_kept():
+    n = 3000
+    edu = pd.Series(RNG.choice(["1", "2", "3", "4", "5"], n))
+    y = pd.Series((RNG.random(n) < np.where(edu == "5", 0.45, 0.25)).astype(int))
+    bp = fit_bins(pd.DataFrame({"Education": edu}), y)
+    bins = bp.get_binned_variable("Education").transform(np.array(["4", "5", "2"]), "bins")
+    assert str(bins[0]) == str(bins[1])  # 4 and 5 share a bin whatever the data say
+    assert str(bins[0]) != str(bins[2])
+
+
+def test_illogical_education_points_are_refused():
+    class FakeBins:  # WoE per code: secondary (4) looks safer than higher (5)
+        woe = {"1": -0.2, "2": -0.1, "3": -0.1, "4": 0.2, "5": 0.1}
+
+        def get_binned_variable(self, name):
+            return self
+
+        def transform(self, x, metric):
+            return np.array([self.woe[v] for v in x])
+
+    card = Scorecard(features=["Education"], intercept=-0.5, coefficients={"Education": -0.3})
+    with pytest.raises(IllogicalPointsError):
+        check_logical_points(FakeBins(), card)
+    FakeBins.woe["5"] = 0.2  # tie is fine: points never fall
+    check_logical_points(FakeBins(), card)
+
+
+def test_brier_of_perfect_predictions_is_zero():
+    assert brier([0, 1, 1], [0.0, 1.0, 1.0]) == 0
+    assert brier([0, 1], [0.5, 0.5]) == pytest.approx(0.25)
 
 
 def test_gini_of_a_perfect_score_is_one():

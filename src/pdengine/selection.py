@@ -28,6 +28,9 @@ def fit_bins(X: pd.DataFrame, y: pd.Series) -> BinningProcess:
         for c in features
         if c not in categorical
     }
+    for c, groups in S.MANUAL_GROUPS.items():  # documented manual overrides (D-023)
+        if c in features:
+            params[c] = {"user_splits": groups, "user_splits_fixed": [True] * len(groups)}
     bp = BinningProcess(
         features,
         categorical_variables=categorical,
