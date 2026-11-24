@@ -105,3 +105,6 @@ RECAL_VALIDATE_END = "2021-04-01"  # notebook 08: fit before this date, test on 
 RECAL_WINDOW = (RECAL_START, OOT_END)  # final shift: every post-break loan (make train)
 RECAL_MIN_LOANS = 500  # fewer post-break loans: no shift, flagged (Spain)
 JEFFREYS_ALPHA = 0.05  # ECB (2019) one-sided Jeffreys test of PD underestimation
+# D-030a: closed testing (Vergouwe et al., 2017). A per-country slope on the logit is added to the
+# shift only when a likelihood-ratio test asks for it at this level.
+RECAL_SLOPE_ALPHA = 0.05

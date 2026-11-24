@@ -33,7 +33,8 @@ A running record of the modelling and engineering choices in this project, why t
 | D-027 | 2026-11-23 | Partly superseded by D-029 |
 | D-028 | 2026-11-24 | Accepted |
 | D-029 | 2026-11-24 | Accepted |
-| D-030 | 2026-11-24 | Accepted |
+| D-030 | 2026-11-24 | Accepted, extended by D-030a |
+| D-030a | 2026-11-24 | Accepted |
 
 ---
 
@@ -557,7 +558,22 @@ Over eight seeds, the six core features are chosen every time. Education also en
 
 **Rejected.** Platt scaling (no gain over the shift on the test window: Brier equal to 4 decimals in Finland). Isotonic regression (overfits Finland's 1,161 fit loans: slope 0.42, Gini 0.376 → 0.366). One shift for the whole book (the country mix changes over time; the pooled slope is 0.60). Calibrating on all of 2020 (includes the pre-break quarter).
 
-**Open.** After the shift, the riskiest fifth of Estonian test loans is under-predicted (24.1% observed vs 20.8%, Jeffreys p < 0.001). On all post-break loans the closed testing procedure (Vergouwe et al., 2017) asks for a slope in both countries (Estonia 1.09, p = 0.006; Finland 1.52, p < 0.001). Proposed as D-030a: add a per-country slope when the likelihood-ratio test asks for it.
+**Open.** After the shift, the riskiest fifth of Estonian test loans is under-predicted (24.1% observed vs 20.8%, Jeffreys p < 0.001). On all post-break loans the closed testing procedure (Vergouwe et al., 2017) asks for a slope in both countries (Estonia 1.09, p = 0.006; Finland 1.52, p < 0.001). Resolved by D-030a.
+
+## D-030a Add a per-country calibration slope when a likelihood-ratio test asks for it
+
+**Context.** With the D-030 shift alone, the riskiest fifth of Estonian test loans is under-predicted (24.1% observed vs 20.8%, Jeffreys p < 0.001) and, on all post-break loans, Finland's riskiest fifth fails as well (14.9% vs 12.2%, p = 0.003). The calibration slopes after the shift are above 1: the PDs are too flat for the post-2020 book.
+
+**Decision.** `CountryRecalibration` runs the closed testing procedure (Vergouwe et al., 2017) for each country on the final window: new logit = shift + slope × old logit, where the slope is fitted only if a likelihood-ratio test of "shift + slope" against "shift only" gives p < `RECAL_SLOPE_ALPHA` (0.05); otherwise it is 1. The slope is positive, so ranking, points and reason codes are unchanged. `recalibration.json` stores shifts, slopes and the test p-values.
+
+**Evidence.**
+
+* Fit window (to March 2021): the test keeps "shift only" in both countries (Estonia p = 0.20, Finland p = 0.92), which validates the D-030 method choice.
+* All post-break loans: Estonia slope 1.091 (s.e. 0.033, p = 0.006), Finland 1.519 (s.e. 0.130, p < 0.001). Final: Estonia −0.649 + 1.091 × logit, Finland −1.846 + 1.519 × logit.
+* Every PD quintile passes the Jeffreys test on all post-break loans (lowest p 0.10); Finland's top band improves from p 0.003 to 0.41. ECE: Estonia 0.0060 → 0.0046, Finland 0.0158 → 0.0084.
+* Remaining weakness: on the April to July 2021 months alone, Estonia's top band still leans low (22.2% vs 24.1%, p = 0.023, in-sample). Monitoring item for Phase 6.
+
+**Rejected.** A slope fitted on the fit window alone (would not have fixed the 2021 top band: 21.4% vs 24.1%). Isotonic regression (D-030). A slope for every country regardless of the test (adds a parameter where the data do not ask for one).
 
 ---
 

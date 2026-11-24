@@ -9,6 +9,7 @@ from pdengine.calibration import (
     intercept_shift,
     jeffreys_p,
     logit,
+    slope_test,
 )
 
 WINDOW = ("2020-04-01", "2021-04-01")
@@ -85,3 +86,27 @@ def test_json_round_trip(book, tmp_path):
     rec.to_json(tmp_path / "cal.json")
     back = CountryRecalibration.from_json(tmp_path / "cal.json")
     assert back.shifts == rec.shifts and back.window == rec.window
+
+
+def test_slope_is_added_only_when_the_lr_test_asks():
+    rng = np.random.default_rng(3)
+    n = 30_000
+    country = pd.Series(rng.choice(["EE", "FI"], n))
+    p = pd.Series(expit(rng.normal(-1.0, 1.0, n)))
+    slope = country.map({"EE": 1.0, "FI": 1.5})  # FI's PDs are too flat
+    y = pd.Series(rng.binomial(1, expit(-0.5 + slope * logit(p))))
+    date = pd.Series([pd.Timestamp("2020-06-01")] * n)
+    rec = CountryRecalibration(window=WINDOW).fit(y, p, country, date)
+    assert rec.slopes["EE"] == 1.0 and rec.slope_p_values["EE"] > 0.05
+    assert rec.slopes["FI"] == pytest.approx(1.5, abs=0.08) and rec.slope_p_values["FI"] < 1e-6
+    new = rec.transform(p, country)
+    fi = country.eq("FI")
+    assert (new[fi][p[fi].sort_values().index].diff().dropna() >= -1e-12).all()  # order kept
+
+
+def test_slope_test_finds_no_slope_in_a_calibrated_model():
+    rng = np.random.default_rng(4)
+    p = pd.Series(expit(rng.normal(-1.5, 1.0, 20_000)))
+    y = pd.Series(rng.binomial(1, p))
+    a, b, pval = slope_test(y, p)
+    assert abs(a) < 0.1 and b == pytest.approx(1, abs=0.06) and pval > 0.05

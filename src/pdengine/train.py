@@ -111,7 +111,7 @@ def run(db: Path = S.DB_PATH, out_dir: Path = S.PROCESSED, rebuild_samples: bool
     v2.card.points_table().to_csv(out_dir / "champion_v2_points.csv", index=False)
     recal.to_json(
         out_dir / "recalibration.json",
-        model="Champion v2 intercept shift per country, D-030",
+        model="Champion v2 recalibration per country: shift, slope where tested (D-030, D-030a)",
         check=recal_check[["loans", "default_rate", "mean_pd", "jeffreys_p"]]
         .astype(float)
         .round(4)
@@ -141,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     print("Champion v2 features:", result["champion_v2"].features)
     rec = result["recalibration"]
     print("Recalibration shifts (logit):", {k: round(v, 3) for k, v in rec.shifts.items()})
+    print("Recalibration slopes (1 = shift only):", {k: round(v, 3) for k, v in rec.slopes.items()})
     print("Not recalibrated (too few post-break loans):", rec.not_recalibrated)
     for model, m in result["metrics"].items():
         print(f"\n{model}\n" + pd.DataFrame(m).T.to_string())
