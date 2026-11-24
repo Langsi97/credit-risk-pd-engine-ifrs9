@@ -94,3 +94,14 @@ MONOTONE = {
     "NewCreditCustomer": 1,
     "income_vs_country_median": -1,
 }
+
+# --------------------------------------------------------- recalibration (notebook 08, D-030)
+# Bondora stopped lending in Finland and Spain at the start of the pandemic and restarted in
+# Finland at the end of 2020. Default rates fell from about 24% (2020 Q1) to about 10%, so the
+# development PDs are far too high out of time. One logit shift per country moves them to the
+# post-break level (calibration-in-the-large); ranking, points and reason codes do not change.
+RECAL_START = "2020-04-01"  # first full quarter after the break
+RECAL_VALIDATE_END = "2021-04-01"  # notebook 08: fit before this date, test on the rest of OOT
+RECAL_WINDOW = (RECAL_START, OOT_END)  # final shift: every post-break loan (make train)
+RECAL_MIN_LOANS = 500  # fewer post-break loans: no shift, flagged (Spain)
+JEFFREYS_ALPHA = 0.05  # ECB (2019) one-sided Jeffreys test of PD underestimation

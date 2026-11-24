@@ -45,7 +45,8 @@ The project is considered successful when the following outcomes are met:
 | First scorecard: WoE logistic regression, v1 ([05](notebooks/05_scorecard.ipynb)) | Done |
 | Challengers: LightGBM, CatBoost, Explainable Boosting Machine ([06](notebooks/06_challenger.ipynb)) | Done |
 | **Champion v2: logical dummy scorecard with country-specific bins** ([07](notebooks/07_champion_v2.ipynb), `make train`) | Done |
-| Recalibration, risk grades, cut-off and profit analysis, fairness check | Next |
+| PD recalibration per country to the post-2020 level ([08](notebooks/08_recalibration.ipynb), `make train`) | Done |
+| Risk grades, reason codes, cut-off and profit analysis, fairness check | Next |
 | IFRS 9 ECL under macro scenarios (`make ecl`) | Planned |
 | Model documentation report (`make report`) and FastAPI service (`make serve`) | Planned |
 
@@ -76,7 +77,7 @@ The fit is constrained so that a safer bin never gets fewer points (logical by c
 * **Why v1 lost:** notebook 06 shows the challengers' lead came mostly from finer, jointly fitted feature shapes and from features v1's selection rules had removed. Interactions mattered less. Champion v2 fixes those causes inside a scorecard ([D-029](docs/decision_log.md) corrects the first version of that analysis).
 * **Challengers vs Bondora:** all three challengers beat Bondora's model out of time. The glass-box EBM is level with the black boxes on test.
 * **Seed stability:** repeating the v1 pipeline with eight random seeds selects the same core features every time ([D-022, D-023](docs/decision_log.md)).
-* **Calibration:** out of time, every model predicts about 26% default against 14% observed, so the PDs must be recalibrated before any use. That is the next phase. Finland's 2019–2020 break coincides with its national consumer-credit interest cap.
+* **Calibration:** out of time, every model predicted about 26% default against 14% observed. Notebook 08 traces this to Bondora's 2020 lending stop in Finland and Spain and moves champion v2's PDs to the post-2020 level with one shift per country (D-030): on April to July 2021 loans, Estonia 10.8% predicted vs 11.4% observed, Finland 8.9% vs 7.8%. Finland's 2019–2020 break coincides with its national consumer-credit interest cap.
 
 ## What this project does not do, and why
 
@@ -181,6 +182,9 @@ The build stops on duplicate loan IDs or unmatched loans and keeps the previous 
 - [03 Target and samples](notebooks/03_target_and_samples.ipynb): exclusions waterfall, development and out-of-time samples
 - [04 Binning, WoE and IV](notebooks/04_binning_woe_iv.ipynb): bins, within-country checks, stability, feature shortlist
 - [05 Champion scorecard](notebooks/05_scorecard.ipynb): fit, points, Gini against Bondora, calibration, robustness to the random split
+- [06 Challengers](notebooks/06_challenger.ipynb): LightGBM, CatBoost and an EBM, with the corrected gap decomposition
+- [07 Champion v2](notebooks/07_champion_v2.ipynb): the logical dummy scorecard with country-specific bins
+- [08 Recalibration](notebooks/08_recalibration.ipynb): the 2020 regime break, one PD shift per country, Jeffreys tests by country and score band
 
 ## License
 

@@ -10,7 +10,7 @@ Usage
 
 Writes to data/processed/: model_samples.parquet (if rebuilt), binning_process.pkl,
 scorecard_shortlist.json, feature_selection.csv, scorecard.json (v1), champion_v2.pkl,
-champion_v2.json, champion_v2_points.csv and train_metrics.json (both models).
+champion_v2.json, champion_v2_points.csv, recalibration.json (D-030) and train_metrics.json.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ import pandas as pd
 
 from pdengine import samples as samples_mod
 from pdengine import settings as S
+from pdengine.calibration import CountryRecalibration, calibration_table
 from pdengine.champion import fit_champion
 from pdengine.dataset import load_model_data
 from pdengine.registry import load_registry
@@ -64,6 +65,19 @@ def run(db: Path = S.DB_PATH, out_dir: Path = S.PROCESSED, rebuild_samples: bool
         "v1_woe_scorecard": card.predict_pd(woe),
         "champion_v2": v2.predict_pd(data.X, data.country),
     }
+    # D-030: one logit shift per country, fitted on every post-break out-of-time loan.
+    # Fit on the whole OOT sample so a country with no loans in the window (Spain) is flagged.
+    oot = data.sample.eq("oot")
+    post = oot & data.issue_date.ge(S.RECAL_START)
+    recal = CountryRecalibration().fit(
+        data.y[oot], predictions["champion_v2"][oot], data.country[oot], data.issue_date[oot]
+    )
+    recal_check = calibration_table(
+        data.y[post],
+        recal.transform(predictions["champion_v2"][post], data.country[post]),
+        data.country[post],
+    )
+
     metrics = {}
     for model, pd_hat in predictions.items():
         metrics[model] = {}
@@ -95,11 +109,20 @@ def run(db: Path = S.DB_PATH, out_dir: Path = S.PROCESSED, rebuild_samples: bool
         flat_dropped=v2.flat,
     )
     v2.card.points_table().to_csv(out_dir / "champion_v2_points.csv", index=False)
+    recal.to_json(
+        out_dir / "recalibration.json",
+        model="Champion v2 intercept shift per country, D-030",
+        check=recal_check[["loans", "default_rate", "mean_pd", "jeffreys_p"]]
+        .astype(float)
+        .round(4)
+        .to_dict(orient="index"),
+    )
     (out_dir / "train_metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     return {
         "shortlist": selection.shortlist,
         "scorecard": card,
         "champion_v2": v2,
+        "recalibration": recal,
         "metrics": metrics,
     }
 
@@ -116,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
     print("Removed by the sign check:", card.removed)
     print("v1 WoE scorecard:", card.features)
     print("Champion v2 features:", result["champion_v2"].features)
+    rec = result["recalibration"]
+    print("Recalibration shifts (logit):", {k: round(v, 3) for k, v in rec.shifts.items()})
+    print("Not recalibrated (too few post-break loans):", rec.not_recalibrated)
     for model, m in result["metrics"].items():
         print(f"\n{model}\n" + pd.DataFrame(m).T.to_string())
     return 0

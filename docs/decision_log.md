@@ -33,6 +33,7 @@ A running record of the modelling and engineering choices in this project, why t
 | D-027 | 2026-11-23 | Partly superseded by D-029 |
 | D-028 | 2026-11-24 | Accepted |
 | D-029 | 2026-11-24 | Accepted |
+| D-030 | 2026-11-24 | Accepted |
 
 ---
 
@@ -532,6 +533,31 @@ Over eight seeds, the six core features are chosen every time. Education also en
 **Evidence.** Test / OOT Gini: LightGBM 24 0.515 / 0.439, CatBoost 0.516 / 0.449, EBM 10 interactions 0.513 / 0.426; the three are level on test (paired intervals touch zero). All three beat Bondora PD out of time (LightGBM +0.017 to +0.051, CatBoost +0.028 to +0.060, EBM +0.005 to +0.039). Decomposition on the six v1 features (test): v1 0.459; additive LightGBM 0.481, additive EBM 0.488; free LightGBM 0.490, EBM with 10 pairs 0.500. Extra features (EBM additive, 16 vs 6): +0.013 test.
 
 **Rejected.** An ensemble of the best models (no gain on test over the best single model). Monotone EBM shapes (−0.007 to −0.014 test). Keeping the five contradicted constraints.
+
+## D-030 Recalibrate champion v2 per country with an intercept shift on post-break loans
+
+**Context.** Champion v2 (D-028) ranks well out of time but predicts 26.1% default against 14.4% observed. Notebook 08 traces this to a regime break in 2020 Q2: Bondora stopped lending in Finland and Spain at the start of the pandemic, kept lending in Estonia and restarted in Finland at the end of 2020 (Bondora, 2020 annual report). Default rates fell from 24.4% (2020 Q1) to about 10%. The gap differs by country: about −0.76 logits in Estonia, −2.0 in Finland; Spain has no loans after 2020 Q1. The earlier plan (calibrate on 2020, test on 2021) does not work: 2020 Q1 is the old regime, and Finland has 86 loans in the rest of 2020.
+
+**Decision.** `pdengine.calibration.CountryRecalibration`, run by `make train`, writes `data/processed/recalibration.json`:
+
+* One intercept shift per country on the logit scale (calibration-in-the-large), fitted by a logistic regression with the champion's logit as offset.
+* Fitted on every out-of-time loan issued from 2020-04-01 (`RECAL_WINDOW`). Countries with fewer than 500 such loans (`RECAL_MIN_LOANS`) keep their development PDs and are listed as not recalibrated (Spain).
+* Points, ranking and reason codes are unchanged; only the score-to-PD conversion moves. Recalibrated PDs describe the post-2020 regime and are not used for 2016–2019 loans.
+* Calibration is tested with the ECB (2019) one-sided Jeffreys test, the calibration slope (Cox, 1958), ECE and Brier, per country and per score band.
+
+**Evidence.** Method validated on a time split (fit April 2020 to March 2021, test April to July 2021):
+
+| Test window | Default rate | PD before | PD after | ECE before → after | Brier before → after |
+|---|---|---|---|---|---|
+| Estonia (9,231) | 11.4% | 20.2% | 10.8% | 0.088 → 0.014 | 0.1038 → 0.0955 |
+| Finland (4,720) | 7.8% | 38.5% | 8.9% | 0.308 → 0.018 | 0.1664 → 0.0699 |
+
+* Within-country Gini unchanged (EE 0.398, FI 0.376); pooled Gini on the test window 0.238 → 0.398.
+* Final shifts on all post-break loans: Estonia −0.758 (s.e. 0.020, odds × 0.47), Finland −2.027 (s.e. 0.049, odds × 0.13). Estonia's 2021 level drift (10.5% → 11.4%) is absorbed: Jeffreys p on the test months 0.029 with the validation shift, 0.103 with the final shift.
+
+**Rejected.** Platt scaling (no gain over the shift on the test window: Brier equal to 4 decimals in Finland). Isotonic regression (overfits Finland's 1,161 fit loans: slope 0.42, Gini 0.376 → 0.366). One shift for the whole book (the country mix changes over time; the pooled slope is 0.60). Calibrating on all of 2020 (includes the pre-break quarter).
+
+**Open.** After the shift, the riskiest fifth of Estonian test loans is under-predicted (24.1% observed vs 20.8%, Jeffreys p < 0.001). On all post-break loans the closed testing procedure (Vergouwe et al., 2017) asks for a slope in both countries (Estonia 1.09, p = 0.006; Finland 1.52, p < 0.001). Proposed as D-030a: add a per-country slope when the likelihood-ratio test asks for it.
 
 ---
 
